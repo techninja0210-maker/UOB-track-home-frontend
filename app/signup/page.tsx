@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import axios from 'axios';
+import api from '@/lib/api';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -46,7 +46,7 @@ export default function SignupPage() {
     }
 
     try {
-      await axios.post('/api/auth/signup', {
+      await api.post('/api/auth/signup', {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password

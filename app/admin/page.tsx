@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
 interface Receipt {
@@ -79,7 +79,7 @@ export default function AdminPage() {
     }
 
     try {
-      const response = await axios.get('/api/auth/verify', {
+      const response = await api.get('/api/auth/verify', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -101,7 +101,7 @@ export default function AdminPage() {
   const loadReceipts = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await axios.get('/api/admin/receipts', {
+      const response = await api.get('/api/admin/receipts', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -149,11 +149,11 @@ export default function AdminPage() {
       };
 
       if (editingReceipt) {
-        await axios.put(`/api/admin/receipts/${editingReceipt._id}`, receiptData, {
+        await api.put(`/api/admin/receipts/${editingReceipt._id}`, receiptData, {
           headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        await axios.post('/api/admin/receipts', receiptData, {
+        await api.post('/api/admin/receipts', receiptData, {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
@@ -193,7 +193,7 @@ export default function AdminPage() {
 
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      await axios.delete(`/api/admin/receipts/${deleteModal.receipt._id}`, {
+      await api.delete(`/api/admin/receipts/${deleteModal.receipt._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

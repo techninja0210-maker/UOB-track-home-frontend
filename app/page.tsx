@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
 interface Receipt {
@@ -51,7 +51,7 @@ export default function HomePage() {
     }
 
     try {
-      const response = await axios.get('/api/auth/verify', {
+      const response = await api.get('/api/auth/verify', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -89,7 +89,7 @@ export default function HomePage() {
     setReceipt(null);
 
     try {
-      const response = await axios.get(`/api/receipts/${refNumber}`);
+      const response = await api.get(`/api/receipts/${refNumber}`);
       setReceipt(response.data);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -106,7 +106,7 @@ export default function HomePage() {
     if (!receipt) return;
 
     try {
-      const response = await axios.get(`/api/receipts/${receipt.referenceNumber}/pdf`);
+      const response = await api.get(`/api/receipts/${receipt.referenceNumber}/pdf`);
       const receiptData = response.data;
 
       // Dynamic import for jsPDF
@@ -244,7 +244,7 @@ We wish to notify you that UOB Security House must be given 24 hours prior notic
   const logout = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      await axios.post('/api/auth/logout', {}, {
+      await api.post('/api/auth/logout', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (error) {

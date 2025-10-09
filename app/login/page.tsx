@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import axios from 'axios';
+import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
 export default function LoginPage() {
@@ -31,7 +31,7 @@ export default function LoginPage() {
     setMessage('');
 
     try {
-      const response = await axios.post('/api/auth/login', formData);
+      const response = await api.post('/api/auth/login', formData);
       
       // Store token based on keepSignedIn preference
       if (formData.keepSignedIn) {
