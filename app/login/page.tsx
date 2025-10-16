@@ -6,7 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
-export default function LoginPage() {
+ function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -32,9 +32,11 @@ export default function LoginPage() {
     try {
       const response = await api.post('/api/auth/login', formData);
       
-      // Store token in both session storage and cookies
-      sessionStorage.setItem('authToken', response.data.token);
-      document.cookie = `authToken=${response.data.token}; path=/; max-age=86400`; // 24 hours
+      // Store token in both session storage and cookies (client-side only)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('authToken', response.data.token);
+        document.cookie = `authToken=${response.data.token}; path=/; max-age=86400`; // 24 hours
+      }
 
       setMessage('Login successful! Redirecting...');
       setMessageType('success');
@@ -416,4 +418,6 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default LoginPage;
 

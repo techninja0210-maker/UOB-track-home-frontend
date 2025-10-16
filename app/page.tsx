@@ -487,7 +487,7 @@ export default function Dashboard() {
                   <button 
                     className="btn-connect" 
                     onClick={connectMetaMask}
-                    disabled={!window.ethereum}
+                    disabled={typeof window === 'undefined' || !(window as any).ethereum}
                   >
                     <span className="btn-icon">🦊</span>
                     Connect MetaMask

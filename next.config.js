@@ -9,6 +9,20 @@ const nextConfig = {
     domains: ['localhost'],
     unoptimized: true,
   },
+  // Ensure styled-jsx works properly
+  compiler: {
+    styledComponents: true,
+  },
+  // Handle potential build issues
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;
