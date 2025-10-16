@@ -1,30 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
-import Cookies from 'js-cookie';
-
-interface Receipt {
-  _id: string;
-  referenceNumber: string;
-  dateOfIssue: string;
-  dateOfRelease: string | null;
-  depositorName: string;
-  representative: string | null;
-  depositorsAddress: string;
-  type: string;
-  dateOfInitialDeposit: string;
-  nameType: string;
-  numberOfItems: number;
-  chargePerBox: number;
-  origin: string;
-  declaredValue: number;
-  weight: number;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface User {
   id: number;
@@ -33,651 +11,456 @@ interface User {
   role: string;
 }
 
-interface Statistics {
-  total: number;
-  active: number;
-  released: number;
-  pending: number;
+interface KPIData {
+  totalUsers: number;
+  totalGold: number;
+  totalCryptoVolume: number;
+  systemStatus: string;
 }
 
-export default function AdminPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [statistics, setStatistics] = useState<Statistics>({ total: 0, active: 0, released: 0, pending: 0 });
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null);
-  const [formData, setFormData] = useState({
-    dateOfIssue: '',
-    dateOfRelease: '',
-    depositorName: '',
-    representative: '',
-    depositorsAddress: '',
-    type: '',
-    dateOfInitialDeposit: '',
-    nameType: '',
-    numberOfItems: '',
-    chargePerBox: '',
-    origin: '',
-    declaredValue: '',
-    weight: '',
-    status: 'active'
+interface ChartData {
+  date: string;
+  value: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: string;
+  description: string;
+  value: string;
+  timestamp: string;
+}
+
+export default function AdminDashboard() {
+  const [kpiData, setKpiData] = useState<KPIData>({
+    totalUsers: 0,
+    totalGold: 0,
+    totalCryptoVolume: 0,
+    systemStatus: 'Active'
   });
-  const [deleteModal, setDeleteModal] = useState<{ show: boolean; receipt: Receipt | null }>({ show: false, receipt: null });
-  const router = useRouter();
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [selectedChartPeriod, setSelectedChartPeriod] = useState('7 Days');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuthentication();
+    loadDashboardData();
   }, []);
 
-  const checkAuthentication = async () => {
-    const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-    
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+  const loadDashboardData = async () => {
     try {
-      const response = await api.get('/api/auth/verify', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      setLoading(true);
       
-      if (response.data.user.role !== 'admin') {
-        router.push('/');
-        return;
+      // Load KPI data
+      const kpiResponse = await api.get('/api/admin/kpis');
+      if (kpiResponse.data) {
+        setKpiData(kpiResponse.data);
       }
-      
-      setUser(response.data.user);
-      await loadReceipts();
-    } catch (error) {
-      console.error('Authentication error:', error);
-      Cookies.remove('authToken');
-      sessionStorage.removeItem('authToken');
-      router.push('/login');
-    }
-  };
 
-  const loadReceipts = async () => {
-    try {
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await api.get('/api/admin/receipts', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setReceipts(response.data);
-      calculateStatistics(response.data);
+      // Load chart data
+      const chartResponse = await api.get('/api/admin/chart-data');
+      if (chartResponse.data) {
+        setChartData(chartResponse.data);
+      }
+
+      // Load recent activities
+      const activitiesResponse = await api.get('/api/admin/recent-activities');
+      if (activitiesResponse.data) {
+        setRecentActivities(activitiesResponse.data);
+      }
+
     } catch (error) {
-      console.error('Error loading receipts:', error);
+      console.error('Error loading dashboard data:', error);
+      // Set mock data if API fails
+      setKpiData({
+        totalUsers: 1,
+        totalGold: 0,
+        totalCryptoVolume: 0,
+        systemStatus: 'Active'
+      });
+      setRecentActivities([
+        {
+          id: '1',
+          type: 'user',
+          description: 'Admin user logged in',
+          value: '',
+          timestamp: new Date().toISOString()
+        }
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateStatistics = (receiptsData: Receipt[]) => {
-    const stats = {
-      total: receiptsData.length,
-      active: receiptsData.filter(r => r.status === 'active').length,
-      released: receiptsData.filter(r => r.status === 'released').length,
-      pending: receiptsData.filter(r => r.status === 'pending').length
-    };
-    setStatistics(stats);
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const receiptData = {
-        ...formData,
-        numberOfItems: parseInt(formData.numberOfItems),
-        chargePerBox: parseFloat(formData.chargePerBox),
-        declaredValue: parseFloat(formData.declaredValue),
-        weight: parseFloat(formData.weight),
-        dateOfIssue: new Date(formData.dateOfIssue),
-        dateOfRelease: formData.dateOfRelease ? new Date(formData.dateOfRelease) : null,
-        dateOfInitialDeposit: new Date(formData.dateOfInitialDeposit)
-      };
-
-      if (editingReceipt) {
-        await api.put(`/api/admin/receipts/${editingReceipt._id}`, receiptData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } else {
-        await api.post('/api/admin/receipts', receiptData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
-
-      setShowModal(false);
-      setEditingReceipt(null);
-      resetForm();
-      await loadReceipts();
-    } catch (error) {
-      console.error('Error saving receipt:', error);
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'user': return '👤';
+      case 'transaction': return '💰';
+      case 'gold': return '🏆';
+      case 'crypto': return '₿';
+      default: return '📊';
     }
   };
-
-  const handleEdit = (receipt: Receipt) => {
-    setEditingReceipt(receipt);
-    setFormData({
-      dateOfIssue: receipt.dateOfIssue.split('T')[0],
-      dateOfRelease: receipt.dateOfRelease ? receipt.dateOfRelease.split('T')[0] : '',
-      depositorName: receipt.depositorName,
-      representative: receipt.representative || '',
-      depositorsAddress: receipt.depositorsAddress,
-      type: receipt.type,
-      dateOfInitialDeposit: receipt.dateOfInitialDeposit.split('T')[0],
-      nameType: receipt.nameType,
-      numberOfItems: receipt.numberOfItems.toString(),
-      chargePerBox: receipt.chargePerBox.toString(),
-      origin: receipt.origin,
-      declaredValue: receipt.declaredValue.toString(),
-      weight: receipt.weight.toString(),
-      status: receipt.status
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteModal.receipt) return;
-
-    try {
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      await api.delete(`/api/admin/receipts/${deleteModal.receipt._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setDeleteModal({ show: false, receipt: null });
-      await loadReceipts();
-    } catch (error) {
-      console.error('Error deleting receipt:', error);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      dateOfIssue: '',
-      dateOfRelease: '',
-      depositorName: '',
-      representative: '',
-      depositorsAddress: '',
-      type: '',
-      dateOfInitialDeposit: '',
-      nameType: '',
-      numberOfItems: '',
-      chargePerBox: '',
-      origin: '',
-      declaredValue: '',
-      weight: '',
-      status: 'active'
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="container-fluid">
-      {/* Header */}
-      <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div className="container">
-          <a className="navbar-brand" href="#">
-            <i className="fas fa-shield-alt me-2"></i>
-            UOB Security House - Admin Panel
-          </a>
-          <div className="navbar-nav ms-auto">
-            <a className="nav-link" href="/">
-              <i className="fas fa-home me-1"></i>Client View
-            </a>
+    <AdminLayout title="Admin Dashboard" subtitle="Overview of your platform">
+      <div className="admin-dashboard-content">
+        {/* KPI Cards */}
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <div className="kpi-icon">👥</div>
+            <div className="kpi-content">
+              <h3 className="kpi-title">Total Users</h3>
+              <p className="kpi-value">{kpiData.totalUsers}</p>
+            </div>
+          </div>
+          
+          <div className="kpi-card">
+            <div className="kpi-icon">🏆</div>
+            <div className="kpi-content">
+              <h3 className="kpi-title">Gold Holdings</h3>
+              <p className="kpi-value">{kpiData.totalGold.toFixed(4)} oz</p>
+            </div>
+          </div>
+          
+          <div className="kpi-card">
+            <div className="kpi-icon">₿</div>
+            <div className="kpi-content">
+              <h3 className="kpi-title">Crypto Volume</h3>
+              <p className="kpi-value">${kpiData.totalCryptoVolume.toFixed(2)}</p>
+            </div>
+          </div>
+          
+          <div className="kpi-card">
+            <div className="kpi-icon">🟢</div>
+            <div className="kpi-content">
+              <h3 className="kpi-title">System Status</h3>
+              <p className="kpi-value">{kpiData.systemStatus}</p>
+            </div>
           </div>
         </div>
-      </nav>
 
-      <div className="container mt-4">
-        {/* Dashboard Stats */}
-        <div className="row mb-4">
-          <div className="col-md-3">
-            <div className="card bg-primary text-white">
-              <div className="card-body">
-                <div className="d-flex justify-content-between">
-                  <div>
-                    <h4 className="card-title">{statistics.total}</h4>
-                    <p className="card-text">Total Receipts</p>
-                  </div>
-                  <div className="align-self-center">
-                    <i className="fas fa-file-invoice fa-2x"></i>
-                  </div>
-                </div>
-              </div>
+        {/* Charts Section */}
+        <div className="charts-section">
+          <div className="section-header">
+            <h2 className="section-title">Platform Analytics</h2>
+            <div className="chart-period-selector">
+              <select 
+                value={selectedChartPeriod} 
+                onChange={(e) => setSelectedChartPeriod(e.target.value)}
+                className="period-select"
+              >
+                <option value="7 Days">Last 7 Days</option>
+                <option value="30 Days">Last 30 Days</option>
+                <option value="90 Days">Last 90 Days</option>
+              </select>
             </div>
           </div>
-          <div className="col-md-3">
-            <div className="card bg-success text-white">
-              <div className="card-body">
-                <div className="d-flex justify-content-between">
-                  <div>
-                    <h4 className="card-title">{statistics.active}</h4>
-                    <p className="card-text">Active</p>
-                  </div>
-                  <div className="align-self-center">
-                    <i className="fas fa-check-circle fa-2x"></i>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card bg-info text-white">
-              <div className="card-body">
-                <div className="d-flex justify-content-between">
-                  <div>
-                    <h4 className="card-title">{statistics.released}</h4>
-                    <p className="card-text">Released</p>
-                  </div>
-                  <div className="align-self-center">
-                    <i className="fas fa-unlock fa-2x"></i>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card bg-warning text-white">
-              <div className="card-body">
-                <div className="d-flex justify-content-between">
-                  <div>
-                    <h4 className="card-title">{statistics.pending}</h4>
-                    <p className="card-text">Pending</p>
-                  </div>
-                  <div className="align-self-center">
-                    <i className="fas fa-clock fa-2x"></i>
-                  </div>
-                </div>
+          
+          <div className="chart-container">
+            <div className="chart-placeholder">
+              <div className="chart-icon">📊</div>
+              <h3>Analytics Chart</h3>
+              <p>Chart data will be displayed here</p>
+              <div className="mock-chart">
+                <div className="chart-bar" style={{height: '60%'}}></div>
+                <div className="chart-bar" style={{height: '80%'}}></div>
+                <div className="chart-bar" style={{height: '40%'}}></div>
+                <div className="chart-bar" style={{height: '90%'}}></div>
+                <div className="chart-bar" style={{height: '70%'}}></div>
+                <div className="chart-bar" style={{height: '85%'}}></div>
+                <div className="chart-bar" style={{height: '95%'}}></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="row mb-4">
-          <div className="col-md-12">
-            <button 
-              className="btn btn-success" 
-              onClick={() => {
-                resetForm();
-                setEditingReceipt(null);
-                setShowModal(true);
-              }}
-            >
-              <i className="fas fa-plus me-2"></i>Add New Receipt
-            </button>
-          </div>
-        </div>
-
-        {/* Receipts Table */}
-        <div className="card shadow-sm">
-          <div className="card-header bg-light">
-            <h4 className="mb-0">
-              <i className="fas fa-list me-2"></i>
-              All Custodial Receipts
-            </h4>
-          </div>
-          <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-striped table-hover">
-                <thead className="table-dark">
-                  <tr>
-                    <th>Reference Number</th>
-                    <th>Depositor Name</th>
-                    <th>Type</th>
-                    <th>Date of Issue</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receipts.map((receipt) => (
-                    <tr key={receipt._id}>
-                      <td>{receipt.referenceNumber}</td>
-                      <td>{receipt.depositorName}</td>
-                      <td>{receipt.type}</td>
-                      <td>{formatDate(receipt.dateOfIssue)}</td>
-                      <td>
-                        <span className={`badge ${
-                          receipt.status === 'active' ? 'bg-success' : 
-                          receipt.status === 'released' ? 'bg-info' : 'bg-warning'
-                        }`}>
-                          {receipt.status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td>
-                        <button 
-                          className="btn btn-outline-primary btn-sm me-2"
-                          onClick={() => handleEdit(receipt)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button 
-                          className="btn btn-outline-danger btn-sm"
-                          onClick={() => setDeleteModal({ show: true, receipt })}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* Recent Activities */}
+        <div className="activities-section">
+          <h2 className="section-title">Recent Activities</h2>
+          <div className="activities-list">
+            {loading ? (
+              <div className="loading-placeholder">
+                <div className="loading-spinner"></div>
+                <p>Loading activities...</p>
+              </div>
+            ) : recentActivities.length > 0 ? (
+              recentActivities.map((activity) => (
+                <div key={activity.id} className="activity-item">
+                  <div className="activity-icon">
+                    {getActivityIcon(activity.type)}
+                  </div>
+                  <div className="activity-content">
+                    <p className="activity-description">{activity.description}</p>
+                    <p className="activity-timestamp">{formatTimestamp(activity.timestamp)}</p>
+                  </div>
+                  {activity.value && (
+                    <div className="activity-value">{activity.value}</div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="no-activities">
+                <p>No recent activities found</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Add/Edit Receipt Modal */}
-      {showModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  {editingReceipt ? 'Edit Custodial Receipt' : 'Add New Custodial Receipt'}
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => {
-                    setShowModal(false);
-                    setEditingReceipt(null);
-                    resetForm();
-                  }}
-                ></button>
-              </div>
-              <form onSubmit={handleSubmit}>
-                <div className="modal-body">
-                  {/* Custodial Details */}
-                  <h6 className="text-muted mb-3">CUSTODIAL DETAILS</h6>
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="dateOfIssue" className="form-label">Date of Issue</label>
-                      <input 
-                        type="date" 
-                        className="form-control" 
-                        id="dateOfIssue" 
-                        name="dateOfIssue"
-                        value={formData.dateOfIssue}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="dateOfRelease" className="form-label">Date of Release</label>
-                      <input 
-                        type="date" 
-                        className="form-control" 
-                        id="dateOfRelease" 
-                        name="dateOfRelease"
-                        value={formData.dateOfRelease}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                  </div>
+      <style jsx>{`
+        .admin-dashboard-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
 
-                  {/* Depositor Details */}
-                  <h6 className="text-muted mb-3">DEPOSITOR DETAILS</h6>
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="depositorName" className="form-label">Depositor Name</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        id="depositorName" 
-                        name="depositorName"
-                        value={formData.depositorName}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="representative" className="form-label">Representative</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        id="representative" 
-                        name="representative"
-                        value={formData.representative}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                  </div>
-                  <div className="row mb-3">
-                    <div className="col-md-12">
-                      <label htmlFor="depositorsAddress" className="form-label">Depositor's Address</label>
-                      <textarea 
-                        className="form-control" 
-                        id="depositorsAddress" 
-                        name="depositorsAddress"
-                        value={formData.depositorsAddress}
-                        onChange={handleInputChange}
-                        rows={2} 
-                        required 
-                      ></textarea>
-                    </div>
-                  </div>
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="type" className="form-label">Type</label>
-                      <select 
-                        className="form-control" 
-                        id="type" 
-                        name="type"
-                        value={formData.type}
-                        onChange={handleInputChange}
-                        required
-                      >
-                        <option value="">Select Type</option>
-                        <option value="Personal">Personal</option>
-                        <option value="Corporate">Corporate</option>
-                        <option value="Government">Government</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="dateOfInitialDeposit" className="form-label">Date of Initial Deposit</label>
-                      <input 
-                        type="date" 
-                        className="form-control" 
-                        id="dateOfInitialDeposit" 
-                        name="dateOfInitialDeposit"
-                        value={formData.dateOfInitialDeposit}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                  </div>
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 1.5rem;
+        }
 
-                  {/* Item Details */}
-                  <h6 className="text-muted mb-3">ITEM DETAILS</h6>
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="nameType" className="form-label">Name/Type</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        id="nameType" 
-                        name="nameType"
-                        value={formData.nameType}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="numberOfItems" className="form-label">Number of Items</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        id="numberOfItems" 
-                        name="numberOfItems"
-                        value={formData.numberOfItems}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                  </div>
-                  <div className="row mb-3">
-                    <div className="col-md-4">
-                      <label htmlFor="chargePerBox" className="form-label">Charge Per Box</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        className="form-control" 
-                        id="chargePerBox" 
-                        name="chargePerBox"
-                        value={formData.chargePerBox}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label htmlFor="origin" className="form-label">Origin</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        id="origin" 
-                        name="origin"
-                        value={formData.origin}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label htmlFor="declaredValue" className="form-label">Declared Value</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        className="form-control" 
-                        id="declaredValue" 
-                        name="declaredValue"
-                        value={formData.declaredValue}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                  </div>
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="weight" className="form-label">Weight (kg)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        className="form-control" 
-                        id="weight" 
-                        name="weight"
-                        value={formData.weight}
-                        onChange={handleInputChange}
-                        required 
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="status" className="form-label">Status</label>
-                      <select 
-                        className="form-control" 
-                        id="status" 
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                      >
-                        <option value="active">Active</option>
-                        <option value="released">Released</option>
-                        <option value="pending">Pending</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditingReceipt(null);
-                      resetForm();
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    Save Receipt
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+        .kpi-card {
+          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
+          border: 1px solid #333;
+          border-radius: 12px;
+          padding: 1.5rem;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          transition: all 0.3s ease;
+        }
 
-      {/* Delete Confirmation Modal */}
-      {deleteModal.show && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setDeleteModal({ show: false, receipt: null })}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this receipt? This action cannot be undone.</p>
-                <p><strong>Reference Number:</strong> {deleteModal.receipt?.referenceNumber}</p>
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setDeleteModal({ show: false, receipt: null })}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-danger" 
-                  onClick={handleDelete}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        .kpi-card:hover {
+          border-color: #FFD700;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 32px rgba(255, 215, 0, 0.1);
+        }
+
+        .kpi-icon {
+          width: 50px;
+          height: 50px;
+          background: linear-gradient(135deg, #FFD700, #FFA500);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+          color: #1A1A1A;
+        }
+
+        .kpi-content {
+          flex: 1;
+        }
+
+        .kpi-title {
+          font-size: 0.9rem;
+          color: #CCCCCC;
+          margin: 0 0 0.5rem 0;
+          font-weight: 500;
+        }
+
+        .kpi-value {
+          font-size: 1.8rem;
+          font-weight: 700;
+          color: #FFD700;
+          margin: 0;
+        }
+
+        .charts-section {
+          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
+          border: 1px solid #333;
+          border-radius: 12px;
+          padding: 2rem;
+        }
+
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+        }
+
+        .section-title {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #FFD700;
+          margin: 0;
+        }
+
+        .chart-period-selector {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .period-select {
+          background: #1A1A1A;
+          border: 1px solid #444;
+          border-radius: 6px;
+          color: white;
+          padding: 0.5rem 1rem;
+          font-size: 0.9rem;
+        }
+
+        .chart-container {
+          height: 300px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .chart-placeholder {
+          text-align: center;
+          color: #CCCCCC;
+        }
+
+        .chart-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+        }
+
+        .chart-placeholder h3 {
+          color: #FFD700;
+          margin: 0 0 0.5rem 0;
+        }
+
+        .chart-placeholder p {
+          margin: 0 0 2rem 0;
+        }
+
+        .mock-chart {
+          display: flex;
+          align-items: end;
+          gap: 0.5rem;
+          height: 120px;
+          padding: 1rem;
+        }
+
+        .chart-bar {
+          flex: 1;
+          background: linear-gradient(to top, #FFD700, #FFA500);
+          border-radius: 4px 4px 0 0;
+          min-height: 20px;
+        }
+
+        .activities-section {
+          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
+          border: 1px solid #333;
+          border-radius: 12px;
+          padding: 2rem;
+        }
+
+        .activities-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .activity-item {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem;
+          background: #1A1A1A;
+          border-radius: 8px;
+          border: 1px solid #333;
+          transition: all 0.3s ease;
+        }
+
+        .activity-item:hover {
+          border-color: #444;
+          background: #222;
+        }
+
+        .activity-icon {
+          width: 40px;
+          height: 40px;
+          background: #333;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+        }
+
+        .activity-content {
+          flex: 1;
+        }
+
+        .activity-description {
+          color: white;
+          margin: 0 0 0.25rem 0;
+          font-weight: 500;
+        }
+
+        .activity-timestamp {
+          color: #CCCCCC;
+          font-size: 0.85rem;
+          margin: 0;
+        }
+
+        .activity-value {
+          color: #FFD700;
+          font-weight: 600;
+        }
+
+        .loading-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem;
+          color: #CCCCCC;
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid #333;
+          border-top: 3px solid #FFD700;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 1rem;
+        }
+
+        .no-activities {
+          text-align: center;
+          padding: 3rem;
+          color: #CCCCCC;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .kpi-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .section-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+          }
+          
+          .chart-container {
+            height: 200px;
+          }
+          
+          .mock-chart {
+            height: 80px;
+          }
+        }
+      `}</style>
+    </AdminLayout>
   );
 }
-
