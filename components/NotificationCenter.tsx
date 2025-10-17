@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import notificationSocket from '@/lib/notificationSocket';
+import notificationSocket, { addLocalNotificationListener, removeLocalNotificationListener } from '@/lib/notificationSocket';
 
 interface Notification {
   id: string;
@@ -40,10 +40,10 @@ export default function NotificationCenter({ userId }: { userId?: string }) {
       // Auto-show notification
       setIsVisible(true);
 
-      // Auto-hide after 5 seconds
+      // Auto-hide after 3 seconds
       setTimeout(() => {
         setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
-      }, 5000);
+      }, 3000);
 
       // Play notification sound (optional)
       playNotificationSound();
@@ -55,6 +55,26 @@ export default function NotificationCenter({ userId }: { userId?: string }) {
       notificationSocket.removeListener(handleNotification);
     };
   }, [userId]);
+
+  // Local programmatic notifications (reusable across app)
+  useEffect(() => {
+    const handler = (notification: Omit<Notification, 'id' | 'timestamp'>) => {
+      const newNotification: Notification = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        ...notification,
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+      setIsVisible(true);
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
+      }, 3000);
+      playNotificationSound();
+    };
+
+    addLocalNotificationListener(handler);
+    return () => removeLocalNotificationListener(handler);
+  }, []);
 
   const playNotificationSound = () => {
     // Create a simple beep sound using Web Audio API

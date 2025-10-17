@@ -12,10 +12,14 @@ interface Notification {
   };
 }
 
+type LocalNotification = Omit<Notification, 'timestamp'>;
+
 class NotificationSocket {
   private socket: Socket | null = null;
   private listeners: ((notification: Notification) => void)[] = [];
   private userId: string | null = null;
+  private connectListeners: Array<() => void> = [];
+  private localListeners: Array<(n: LocalNotification) => void> = [];
 
   /**
    * Initialize WebSocket connection
@@ -40,6 +44,10 @@ class NotificationSocket {
       if (this.socket && userId) {
         this.socket.emit('authenticate', userId);
       }
+      // Notify connect listeners
+      this.connectListeners.forEach(cb => {
+        try { cb(); } catch {}
+      });
     });
 
     this.socket.on('notification', (notification: Notification) => {
@@ -104,10 +112,45 @@ class NotificationSocket {
   isConnected(): boolean {
     return this.socket?.connected || false;
   }
+
+  /**
+   * Add a listener that fires when socket connects
+   */
+  addConnectListener(callback: () => void) {
+    this.connectListeners.push(callback);
+  }
+
+  /**
+   * Remove a previously added connect listener
+   */
+  removeConnectListener(callback: () => void) {
+    this.connectListeners = this.connectListeners.filter(cb => cb !== callback);
+  }
+
+  /**
+   * Programmatic local notification API (for UI events)
+   */
+  notifyLocal(notification: LocalNotification) {
+    this.localListeners.forEach(cb => {
+      try { cb(notification); } catch {}
+    });
+  }
+
+  addLocalNotificationListener(cb: (n: LocalNotification) => void) {
+    this.localListeners.push(cb);
+  }
+
+  removeLocalNotificationListener(cb: (n: LocalNotification) => void) {
+    this.localListeners = this.localListeners.filter(x => x !== cb);
+  }
 }
 
 // Export singleton instance
 const notificationSocket = new NotificationSocket();
 export default notificationSocket;
+
+// Expose helpers for NotificationCenter to bind
+export const addLocalNotificationListener = (cb: (n: LocalNotification) => void) => notificationSocket.addLocalNotificationListener(cb);
+export const removeLocalNotificationListener = (cb: (n: LocalNotification) => void) => notificationSocket.removeLocalNotificationListener(cb);
 
 

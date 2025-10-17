@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
+import { formatCurrency, formatNumber, formatCompact } from '@/lib/formatters';
 
 interface User {
   id: number;
@@ -13,8 +14,10 @@ interface User {
 
 interface KPIData {
   totalUsers: number;
+  activeUsers: number;
   totalGold: number;
   totalCryptoVolume: number;
+  totalTransactions: number;
   systemStatus: string;
 }
 
@@ -34,8 +37,10 @@ interface RecentActivity {
 export default function AdminDashboard() {
   const [kpiData, setKpiData] = useState<KPIData>({
     totalUsers: 0,
+    activeUsers: 0,
     totalGold: 0,
     totalCryptoVolume: 0,
+    totalTransactions: 0,
     systemStatus: 'Active'
   });
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -54,19 +59,19 @@ export default function AdminDashboard() {
       // Load KPI data
       const kpiResponse = await api.get('/api/admin/kpis');
       if (kpiResponse.data) {
-        setKpiData(kpiResponse.data);
+      setKpiData(kpiResponse.data);
       }
 
       // Load chart data
       const chartResponse = await api.get('/api/admin/chart-data');
       if (chartResponse.data) {
-        setChartData(chartResponse.data);
+      setChartData(chartResponse.data);
       }
 
       // Load recent activities
       const activitiesResponse = await api.get('/api/admin/recent-activities');
       if (activitiesResponse.data) {
-        setRecentActivities(activitiesResponse.data);
+      setRecentActivities(activitiesResponse.data);
       }
 
     } catch (error) {
@@ -74,8 +79,10 @@ export default function AdminDashboard() {
       // Set mock data if API fails
       setKpiData({
         totalUsers: 1,
+        activeUsers: 1,
         totalGold: 0,
         totalCryptoVolume: 0,
+        totalTransactions: 0,
         systemStatus: 'Active'
       });
       setRecentActivities([
@@ -98,369 +105,251 @@ export default function AdminDashboard() {
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case 'user': return '👤';
-      case 'transaction': return '💰';
-      case 'gold': return '🏆';
-      case 'crypto': return '₿';
-      default: return '📊';
+      case 'user':
+        return (
+          <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+        );
+      case 'transaction':
+        return (
+          <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+          </div>
+        );
+      case 'gold':
+        return (
+          <div className="h-8 w-8 bg-yellow-100 rounded-full flex items-center justify-center">
+            <span className="text-yellow-600 text-sm">🥇</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        );
     }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="Admin Dashboard" subtitle="Overview of your platform">
-      <div className="admin-dashboard-content">
+    <AdminLayout>
+      <div>
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="mt-2 text-gray-600">Monitor and manage the platform</p>
+        </div>
+        
         {/* KPI Cards */}
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-icon">👥</div>
-            <div className="kpi-content">
-              <h3 className="kpi-title">Total Users</h3>
-              <p className="kpi-value">{kpiData.totalUsers}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-2xl font-bold text-gray-900">{formatNumber(kpiData.totalUsers)}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatNumber(kpiData.activeUsers)} active</p>
+      </div>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+                </div>
             </div>
           </div>
-          
-          <div className="kpi-card">
-            <div className="kpi-icon">🏆</div>
-            <div className="kpi-content">
-              <h3 className="kpi-title">Gold Holdings</h3>
-              <p className="kpi-value">{kpiData.totalGold.toFixed(4)} oz</p>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Gold Holdings</p>
+                <p className="text-2xl font-bold text-yellow-600">{formatNumber(kpiData.totalGold, 4)} g</p>
+                <p className="text-xs text-gray-500 mt-1">Across all users</p>
+        </div>
+              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600 text-xl">🥇</span>
+              </div>
+              </div>
+            </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Crypto Volume</p>
+                <p className="text-2xl font-bold text-green-600">{formatCompact(kpiData.totalCryptoVolume)}</p>
+                <p className="text-xs text-gray-500 mt-1">Total trading volume</p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+            </div>
+              </div>
+            </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                <p className="text-2xl font-bold text-purple-600">{formatNumber(kpiData.totalTransactions)}</p>
+                <p className="text-xs text-gray-500 mt-1">All time</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
             </div>
           </div>
-          
-          <div className="kpi-card">
-            <div className="kpi-icon">₿</div>
-            <div className="kpi-content">
-              <h3 className="kpi-title">Crypto Volume</h3>
-              <p className="kpi-value">${kpiData.totalCryptoVolume.toFixed(2)}</p>
-            </div>
-          </div>
-          
-          <div className="kpi-card">
-            <div className="kpi-icon">🟢</div>
-            <div className="kpi-content">
-              <h3 className="kpi-title">System Status</h3>
-              <p className="kpi-value">{kpiData.systemStatus}</p>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">System Status</p>
+                <p className="text-2xl font-bold text-green-600">{kpiData.systemStatus}</p>
+                <p className="text-xs text-gray-500 mt-1">All systems operational</p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Charts Section */}
-        <div className="charts-section">
-          <div className="section-header">
-            <h2 className="section-title">Platform Analytics</h2>
-            <div className="chart-period-selector">
-              <select 
-                value={selectedChartPeriod} 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Chart Section */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Trading Volume</h3>
+              <select
+                value={selectedChartPeriod}
                 onChange={(e) => setSelectedChartPeriod(e.target.value)}
-                className="period-select"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
-                <option value="7 Days">Last 7 Days</option>
-                <option value="30 Days">Last 30 Days</option>
-                <option value="90 Days">Last 90 Days</option>
+                <option value="7 Days">7 Days</option>
+                <option value="30 Days">30 Days</option>
+                <option value="90 Days">90 Days</option>
               </select>
             </div>
-          </div>
-          
-          <div className="chart-container">
-            <div className="chart-placeholder">
-              <div className="chart-icon">📊</div>
-              <h3>Analytics Chart</h3>
-              <p>Chart data will be displayed here</p>
-              <div className="mock-chart">
-                <div className="chart-bar" style={{height: '60%'}}></div>
-                <div className="chart-bar" style={{height: '80%'}}></div>
-                <div className="chart-bar" style={{height: '40%'}}></div>
-                <div className="chart-bar" style={{height: '90%'}}></div>
-                <div className="chart-bar" style={{height: '70%'}}></div>
-                <div className="chart-bar" style={{height: '85%'}}></div>
-                <div className="chart-bar" style={{height: '95%'}}></div>
+            
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-center">
+                <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+                </div>
+                <p className="text-gray-500">Chart data will be displayed here</p>
+                <p className="text-sm text-gray-400">Integration with charting library needed</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Recent Activities */}
-        <div className="activities-section">
-          <h2 className="section-title">Recent Activities</h2>
-          <div className="activities-list">
-            {loading ? (
-              <div className="loading-placeholder">
-                <div className="loading-spinner"></div>
-                <p>Loading activities...</p>
+          {/* Recent Activities */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Activities</h3>
+            
+            <div className="space-y-4">
+                {recentActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-3">
+                  {getActivityIcon(activity.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{activity.description}</p>
+                    {activity.value && (
+                      <p className="text-sm text-gray-500">{activity.value}</p>
+                    )}
+                    <p className="text-xs text-gray-400">{formatTimestamp(activity.timestamp)}</p>
+                    </div>
+                    </div>
+              ))}
+              
+              {recentActivities.length === 0 && (
+                <div className="text-center py-8">
+                  <div className="h-16 w-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500">No recent activities</p>
               </div>
-            ) : recentActivities.length > 0 ? (
-              recentActivities.map((activity) => (
-                <div key={activity.id} className="activity-item">
-                  <div className="activity-icon">
-                    {getActivityIcon(activity.type)}
-                  </div>
-                  <div className="activity-content">
-                    <p className="activity-description">{activity.description}</p>
-                    <p className="activity-timestamp">{formatTimestamp(activity.timestamp)}</p>
-                  </div>
-                  {activity.value && (
-                    <div className="activity-value">{activity.value}</div>
-                  )}
+              )}
+            </div>
                 </div>
-              ))
-            ) : (
-              <div className="no-activities">
-                <p>No recent activities found</p>
               </div>
-            )}
+              
+        {/* Quick Actions */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <a
+              href="/admin/users"
+              className="bg-white border border-gray-300 rounded-xl p-4 hover:bg-gray-50 transition-colors duration-200 text-center"
+            >
+              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+                </div>
+              <p className="font-medium text-gray-900">Manage Users</p>
+              <p className="text-sm text-gray-500">View and manage user accounts</p>
+            </a>
+
+            <a
+              href="/admin/gold-pricing"
+              className="bg-white border border-gray-300 rounded-xl p-4 hover:bg-gray-50 transition-colors duration-200 text-center"
+            >
+              <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <span className="text-yellow-600 text-xl">🥇</span>
+                </div>
+              <p className="font-medium text-gray-900">Gold Pricing</p>
+              <p className="text-sm text-gray-500">Update gold prices and settings</p>
+            </a>
+
+            <a
+              href="/admin/skrs"
+              className="bg-white border border-gray-300 rounded-xl p-4 hover:bg-gray-50 transition-colors duration-200 text-center"
+            >
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="font-medium text-gray-900">SKR Management</p>
+              <p className="text-sm text-gray-500">Manage gold holdings and receipts</p>
+            </a>
+
+            <a
+              href="/admin/transactions"
+              className="bg-white border border-gray-300 rounded-xl p-4 hover:bg-gray-50 transition-colors duration-200 text-center"
+            >
+              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            </div>
+              <p className="font-medium text-gray-900">Transactions</p>
+              <p className="text-sm text-gray-500">Monitor all platform transactions</p>
+            </a>
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .admin-dashboard-content {
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-        }
-
-        .kpi-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .kpi-card {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          transition: all 0.3s ease;
-        }
-
-        .kpi-card:hover {
-          border-color: #FFD700;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 32px rgba(255, 215, 0, 0.1);
-        }
-
-        .kpi-icon {
-          width: 50px;
-          height: 50px;
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          color: #1A1A1A;
-        }
-
-        .kpi-content {
-          flex: 1;
-        }
-
-        .kpi-title {
-          font-size: 0.9rem;
-          color: #CCCCCC;
-          margin: 0 0 0.5rem 0;
-          font-weight: 500;
-        }
-
-        .kpi-value {
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0;
-        }
-
-        .charts-section {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 2rem;
-        }
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2rem;
-        }
-
-        .section-title {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0;
-        }
-
-        .chart-period-selector {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .period-select {
-          background: #1A1A1A;
-          border: 1px solid #444;
-          border-radius: 6px;
-          color: white;
-          padding: 0.5rem 1rem;
-          font-size: 0.9rem;
-        }
-
-        .chart-container {
-          height: 300px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .chart-placeholder {
-          text-align: center;
-          color: #CCCCCC;
-        }
-
-        .chart-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .chart-placeholder h3 {
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .chart-placeholder p {
-          margin: 0 0 2rem 0;
-        }
-
-        .mock-chart {
-          display: flex;
-          align-items: end;
-          gap: 0.5rem;
-          height: 120px;
-          padding: 1rem;
-        }
-
-        .chart-bar {
-          flex: 1;
-          background: linear-gradient(to top, #FFD700, #FFA500);
-          border-radius: 4px 4px 0 0;
-          min-height: 20px;
-        }
-
-        .activities-section {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 2rem;
-        }
-
-        .activities-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .activity-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          background: #1A1A1A;
-          border-radius: 8px;
-          border: 1px solid #333;
-          transition: all 0.3s ease;
-        }
-
-        .activity-item:hover {
-          border-color: #444;
-          background: #222;
-        }
-
-        .activity-icon {
-          width: 40px;
-          height: 40px;
-          background: #333;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.2rem;
-        }
-
-        .activity-content {
-          flex: 1;
-        }
-
-        .activity-description {
-          color: white;
-          margin: 0 0 0.25rem 0;
-          font-weight: 500;
-        }
-
-        .activity-timestamp {
-          color: #CCCCCC;
-          font-size: 0.85rem;
-          margin: 0;
-        }
-
-        .activity-value {
-          color: #FFD700;
-          font-weight: 600;
-        }
-
-        .loading-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-        }
-
-        .loading-spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #333;
-          border-top: 3px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 1rem;
-        }
-
-        .no-activities {
-          text-align: center;
-          padding: 3rem;
-          color: #CCCCCC;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-          .kpi-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .section-header {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: flex-start;
-          }
-          
-          .chart-container {
-            height: 200px;
-          }
-          
-          .mock-chart {
-            height: 80px;
-          }
-        }
-      `}</style>
     </AdminLayout>
   );
 }

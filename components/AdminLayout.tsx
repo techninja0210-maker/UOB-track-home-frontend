@@ -1,9 +1,11 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import AdminSidebar from './AdminSidebar';
+import Image from 'next/image';
+import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/api';
+import Cookies from 'js-cookie';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -13,31 +15,56 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+  const navItems = [
+    { href: '/admin', label: 'Dashboard' },
+    { href: '/admin/users', label: 'Users' },
+    { href: '/admin/transactions', label: 'Transactions' },
+    { href: '/admin/skrs', label: 'SKRs' },
+    { href: '/admin/gold-pricing', label: 'Gold Pricing' },
+    { href: '/admin/pool-wallets', label: 'Pool Wallets' }
+  ];
 
   useEffect(() => {
     checkAuth();
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.user-profile')) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const checkAuth = async () => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       
       if (!token) {
         router.push('/login');
         return;
       }
 
-      const response = await api.get('/api/auth/me');
+      const response = await api.get('/api/auth/verify', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      if (response.data.role !== 'admin') {
+      if (response.data.user.role !== 'admin') {
         router.push('/');
         return;
       }
       
-      setUser(response.data);
+      setUser(response.data.user);
     } catch (error) {
       console.error('Authentication error:', error);
       router.push('/login');
@@ -46,131 +73,150 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      if (token) {
+        await api.post('/api/auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      Cookies.remove('authToken');
+      sessionStorage.removeItem('authToken');
+      router.push('/login');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="admin-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading admin panel...</p>
-        <style jsx>{`
-          .admin-loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: #1A1A1A;
-            color: white;
-          }
-          
-          .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #333;
-            border-top: 4px solid #FFD700;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 1rem;
-          }
-          
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="admin-layout">
-      <AdminSidebar userRole={user?.role} />
-      
-      {/* Main Content */}
-      <div className="admin-main-content">
-        {/* Dynamic Header for specific pages */}
-        {(title || subtitle) && (
-          <div className="page-header">
-            <div className="page-header-content">
-              {title && <h2 className="page-header-title">{title}</h2>}
-              {subtitle && <p className="page-header-subtitle">{subtitle}</p>}
+    <div className="min-h-screen bg-white">
+      {/* Top Navigation Bar */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link href="/admin" className="flex items-center space-x-3">
+                <Image
+                  src="/UOB%20Security%20House%20Logo%20Option%203.jpg"
+                  alt="UOB Security House"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-lg object-cover"
+                  priority
+                />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
+                  <p className="text-xs text-gray-500">Admin Panel</p>
+                </div>
+              </Link>
+            </div>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-8">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`text-sm font-medium transition-colors duration-200 ${
+                      isActive
+                        ? 'text-primary-600 border-b-2 border-primary-600 pb-1'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* User Profile */}
+            <div className="relative user-profile">
+              <button
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="flex items-center space-x-3 text-sm rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors duration-200"
+              >
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-primary-600 font-medium text-sm">
+                    {user?.fullName?.charAt(0) || 'A'}
+                  </span>
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium text-gray-900">{user?.fullName}</div>
+                  <div className="text-xs text-gray-500">Administrator</div>
+                </div>
+                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showProfileDropdown && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
+                  </div>
+                  <div className="py-1">
+                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      Profile Settings
+                    </button>
+                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      System Settings
+                    </button>
+                  </div>
+                  <div className="border-t border-gray-200 py-1">
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-        
-        {/* Page Content */}
-        <div className="page-content">
-          {children}
         </div>
-      </div>
 
-      <style jsx>{`
-        .admin-layout {
-          min-height: 100vh;
-          background: #1A1A1A;
-          color: white;
-        }
+        {/* Mobile Navigation */}
+        <div className="md:hidden border-t border-gray-200 bg-gray-50">
+          <div className="px-4 py-2 space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    isActive
+                      ? 'bg-primary-50 text-primary-600'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
 
-        .admin-main-content {
-          margin-left: 250px;
-          padding-top: 80px;
-          min-height: 100vh;
-        }
-
-        .page-header {
-          background: #2C2C2C;
-          border-bottom: 1px solid #333;
-          padding: 2rem;
-          margin-bottom: 2rem;
-        }
-
-        .page-header-content {
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .page-header-title {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .page-header-subtitle {
-          font-size: 1rem;
-          color: #CCCCCC;
-          margin: 0;
-        }
-
-        .page-content {
-          padding: 0 2rem 2rem 2rem;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-          .admin-main-content {
-            margin-left: 200px;
-            padding: 0 1rem;
-          }
-          
-          .page-header {
-            padding: 1rem;
-            margin-bottom: 1rem;
-          }
-          
-          .page-content {
-            padding: 0 0 1rem 0;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .admin-main-content {
-            margin-left: 0;
-            padding-top: 60px;
-          }
-        }
-      `}</style>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </main>
     </div>
   );
 }

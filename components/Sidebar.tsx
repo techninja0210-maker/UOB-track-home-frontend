@@ -11,171 +11,102 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <div className="logo">
-          <div className="logo-icon">$</div>
-          <div className="logo-text">Track Platform</div>
+    <aside className="w-64 bg-white border-r border-gray-200 min-h-screen">
+      {/* Logo */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center space-x-3">
+          <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">U</span>
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">UOB Security</h1>
+            <p className="text-xs text-gray-500">Track Platform</p>
+          </div>
         </div>
       </div>
 
-      <nav className="sidebar-nav">
+      {/* Navigation */}
+      <nav className="p-4 space-y-2">
         <NavLink href="/">
-          <div className="nav-icon">🏠</div>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+          </svg>
           <span>Dashboard</span>
         </NavLink>
 
-        {false && (
-          <NavLink href="/wallet">
-            <div className="nav-icon">💰</div>
-            <span>Wallet</span>
-          </NavLink>
-        )}
-
         <NavLink href="/exchange">
-          <div className="nav-icon">🔁</div>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
           <span>Exchange</span>
         </NavLink>
 
         <NavLink href="/skrs">
-          <div className="nav-icon">📄</div>
-          <span>SKRs</span>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>Gold Holdings</span>
         </NavLink>
 
         <NavLink href="/transactions">
-          <div className="nav-icon">📊</div>
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
           <span>Transactions</span>
         </NavLink>
 
         {userRole === 'admin' && (
           <>
-            <div className="nav-divider"></div>
+            <div className="border-t border-gray-200 my-4"></div>
+            <div className="px-3 py-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</h3>
+            </div>
             
             <NavLink href="/admin">
-              <div className="nav-icon">⚙️</div>
-              <span>Admin</span>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Analytics</span>
             </NavLink>
 
-            <NavLink href="/admin/transactions">
-              <div className="nav-icon">📋</div>
-              <span>All Transactions</span>
-            </NavLink>
-
-            <NavLink href="/admin/withdrawals">
-              <div className="nav-icon">📤</div>
-              <span>Withdrawals</span>
+            <NavLink href="/admin/users">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
+              <span>Users</span>
             </NavLink>
 
             <NavLink href="/admin/gold-pricing">
-              <div className="nav-icon">💰</div>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
               <span>Gold Pricing</span>
             </NavLink>
 
             <NavLink href="/admin/skrs">
-              <div className="nav-icon">📜</div>
-              <span>SKR Management</span>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>All SKRs</span>
+            </NavLink>
+
+            <NavLink href="/admin/transactions">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span>All Transactions</span>
             </NavLink>
           </>
         )}
       </nav>
 
-      <style jsx>{`
-        .sidebar {
-          width: 250px;
-          background: #2C2C2C;
-          padding: 2rem 0;
-          border-right: 1px solid #444;
-          height: 100vh;
-          position: fixed;
-          left: 0;
-          top: 0;
-          overflow-y: auto;
-        }
-
-        .sidebar-header {
-          padding: 0 2rem 2rem;
-          border-bottom: 1px solid #444;
-        }
-
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .logo-icon {
-          width: 40px;
-          height: 40px;
-          background: linear-gradient(45deg, #FFD700, #B8860B);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 1.2rem;
-          color: #000;
-        }
-
-        .logo-text {
-          font-size: 1.1rem;
-          font-weight: bold;
-          color: #FFD700;
-        }
-
-        .sidebar-nav {
-          padding: 2rem 0;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .nav-divider {
-          height: 1px;
-          background: #444;
-          margin: 1rem 2rem;
-        }
-
-        :global(.sidebar-nav .nav-item) {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem 2rem;
-          color: #999;
-          text-decoration: none;
-          transition: all 0.3s;
-          border-left: 3px solid transparent;
-        }
-
-        :global(.sidebar-nav .nav-item:hover) {
-          background: rgba(255, 215, 0, 0.1);
-          color: #FFD700;
-          border-left-color: #FFD700;
-        }
-
-        :global(.sidebar-nav .nav-item.active) {
-          background: rgba(255, 215, 0, 0.15);
-          color: #FFD700;
-          border-left-color: #FFD700;
-          font-weight: 600;
-        }
-
-        :global(.sidebar-nav .nav-icon) {
-          font-size: 1.2rem;
-          width: 24px;
-          text-align: center;
-        }
-
-        @media (max-width: 768px) {
-          .sidebar {
-            width: 100%;
-            height: auto;
-            position: relative;
-            border-right: none;
-            border-bottom: 1px solid #444;
-          }
-        }
-      `}</style>
-    </div>
+      {/* Footer */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="text-xs text-gray-500 text-center">
+          © 2024 UOB Security House
+        </div>
+      </div>
+    </aside>
   );
 }
-
-

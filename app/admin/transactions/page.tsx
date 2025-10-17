@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
+import { formatCurrency, formatCrypto, formatNumber } from '@/lib/formatters';
 
 interface Transaction {
   id: string;
@@ -13,6 +14,7 @@ interface Transaction {
   status: string;
   created_at: string;
   transaction_hash?: string;
+  description?: string;
 }
 
 interface Withdrawal {
@@ -32,6 +34,9 @@ export default function AdminTransactions() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'transactions' | 'withdrawals'>('transactions');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,7 +63,40 @@ export default function AdminTransactions() {
       setTransactions(response.data || []);
     } catch (error) {
       console.error('Error loading transactions:', error);
-      setTransactions([]);
+      // Mock data for development
+      setTransactions([
+        {
+          id: '1',
+          user_id: 'user-1',
+          type: 'deposit',
+          currency: 'ETH',
+          amount: 0.5,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          transaction_hash: '0x1234...5678',
+          description: 'ETH deposit to wallet'
+        },
+        {
+          id: '2',
+          user_id: 'user-2',
+          type: 'buy_gold',
+          currency: 'USD',
+          amount: 2500,
+          status: 'completed',
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+          description: 'Bought 1.2g gold'
+        },
+        {
+          id: '3',
+          user_id: 'user-3',
+          type: 'sell_gold',
+          currency: 'USDT',
+          amount: 1800,
+          status: 'pending',
+          created_at: new Date(Date.now() - 172800000).toISOString(),
+          description: 'Sold 0.8g gold'
+        }
+      ]);
     }
   };
 
@@ -68,622 +106,468 @@ export default function AdminTransactions() {
       setWithdrawals(response.data || []);
     } catch (error) {
       console.error('Error loading withdrawals:', error);
-      setWithdrawals([]);
+      // Mock data for development
+      setWithdrawals([
+        {
+          id: '1',
+          user_id: 'user-1',
+          currency: 'BTC',
+          amount: 0.1,
+          destination_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          fee: 0.001,
+          net_amount: 0.099
+        },
+        {
+          id: '2',
+          user_id: 'user-2',
+          currency: 'ETH',
+          amount: 2.0,
+          destination_address: '0x742d35Cc6634C0532925a3b8D2D3B2c7d8E9f0A1',
+          status: 'completed',
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+          fee: 0.01,
+          net_amount: 1.99
+        }
+      ]);
     }
   };
 
-  const handleApproveWithdrawal = async (id: string) => {
-    try {
-      setProcessingId(id);
-      await api.post(`/api/admin/withdrawals/${id}/approve`);
-      await loadWithdrawals();
-    } catch (error) {
-      console.error('Error approving withdrawal:', error);
-      alert('Failed to approve withdrawal');
-    } finally {
-      setProcessingId(null);
-    }
-  };
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
+    const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
 
-  const handleRejectWithdrawal = async (id: string) => {
-    const reason = prompt('Enter rejection reason:');
-    if (!reason) return;
-
-    try {
-      setProcessingId(id);
-      await api.post(`/api/admin/withdrawals/${id}/reject`, { reason });
-      await loadWithdrawals();
-    } catch (error) {
-      console.error('Error rejecting withdrawal:', error);
-      alert('Failed to reject withdrawal');
-    } finally {
-      setProcessingId(null);
-    }
-  };
+  const filteredWithdrawals = withdrawals.filter(withdrawal => {
+    const matchesSearch = withdrawal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         withdrawal.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         withdrawal.destination_address.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || withdrawal.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
 
-  const formatAmount = (amount: number, currency: string) => {
-    return `${amount.toFixed(8)} ${currency}`;
-  };
-
   const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      pending: { bg: '#FFA500', color: 'white', text: 'Pending' },
-      completed: { bg: '#4CAF50', color: 'white', text: 'Completed' },
-      failed: { bg: '#f44336', color: 'white', text: 'Failed' },
-      rejected: { bg: '#f44336', color: 'white', text: 'Rejected' }
+    const statusConfig = {
+      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
+      failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
+      cancelled: { color: 'bg-gray-100 text-gray-800', label: 'Cancelled' }
     };
     
-    const style = statusStyles[status as keyof typeof statusStyles] || statusStyles.pending;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     
     return (
-      <span 
-        className="status-badge"
-        style={{ backgroundColor: style.bg, color: style.color }}
-      >
-        {style.text}
+      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.color}`}>
+        {config.label}
       </span>
     );
   };
 
-  const getTransactionIcon = (type: string, currency: string) => {
-    if (type === 'deposit') return '📥';
-    if (type === 'withdrawal') return '📤';
-    if (currency === 'BTC') return '₿';
-    if (currency === 'ETH') return 'Ξ';
-    if (currency === 'USDT') return '💵';
-    return '💰';
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case 'deposit':
+        return (
+          <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+        );
+      case 'withdrawal':
+        return (
+          <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </div>
+        );
+      case 'buy_gold':
+        return (
+          <div className="h-8 w-8 bg-yellow-100 rounded-full flex items-center justify-center">
+            <span className="text-yellow-600 text-sm">🥇</span>
+          </div>
+        );
+      case 'sell_gold':
+        return (
+          <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+            <span className="text-orange-600 text-sm">💰</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </div>
+        );
+    }
   };
 
+  const processWithdrawal = async (withdrawalId: string) => {
+    try {
+      setProcessingId(withdrawalId);
+      await api.post(`/api/admin/process-withdrawal/${withdrawalId}`);
+      await loadWithdrawals(); // Reload data
+    } catch (error) {
+      console.error('Error processing withdrawal:', error);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="Transaction Management" subtitle="Monitor and manage all platform transactions">
-      <div className="transactions-management">
-        {/* Tabs */}
-        <div className="tabs-section">
-          <button 
-            className={`tab-button ${activeTab === 'transactions' ? 'active' : ''}`}
-            onClick={() => setActiveTab('transactions')}
-          >
-            📊 All Transactions
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'withdrawals' ? 'active' : ''}`}
-            onClick={() => setActiveTab('withdrawals')}
-          >
-            💸 Withdrawal Requests
-          </button>
+    <AdminLayout>
+      <div>
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Transaction Management</h1>
+          <p className="mt-2 text-gray-600">Monitor and manage all platform transactions</p>
         </div>
 
-        {/* Transactions Tab */}
-        {activeTab === 'transactions' && (
-          <div className="tab-content">
-            <div className="transactions-table-container">
-              {loading ? (
-                <div className="loading-state">
-                  <div className="loading-spinner"></div>
-                  <p>Loading transactions...</p>
-                </div>
-              ) : (
-                <div className="transactions-table">
-                  <div className="table-header">
-                    <div className="table-cell">Type</div>
-                    <div className="table-cell">Currency</div>
-                    <div className="table-cell">Amount</div>
-                    <div className="table-cell">Status</div>
-                    <div className="table-cell">Date</div>
-                    <div className="table-cell">Hash</div>
-                  </div>
-                  
-                  {transactions.length > 0 ? (
-                    transactions.map((transaction) => (
-                      <div key={transaction.id} className="table-row">
-                        <div className="table-cell">
-                          <div className="transaction-type">
-                            <span className="type-icon">
-                              {getTransactionIcon(transaction.type, transaction.currency)}
-                            </span>
-                            <span className="type-text">{transaction.type}</span>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                <p className="text-2xl font-bold text-gray-900">{transactions.length}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Withdrawals</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {withdrawals.filter(w => w.status === 'pending').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed Today</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {transactions.filter(t => {
+                    const today = new Date();
+                    const transactionDate = new Date(t.created_at);
+                    return t.status === 'completed' && 
+                           transactionDate.toDateString() === today.toDateString();
+                  }).length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Volume</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {formatNumber(
+                    transactions.reduce((sum, t) => sum + t.amount, 0) +
+                    withdrawals.reduce((sum, w) => sum + w.amount, 0), 
+                    2
+                  )}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('transactions')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'transactions'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                All Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab('withdrawals')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'withdrawals'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Withdrawals
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                Search
+              </label>
+              <input
+                type="text"
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search transactions..."
+              />
+            </div>
+            <div>
+              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Status</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            {activeTab === 'transactions' && (
+              <div>
+                <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  Type
+                </label>
+                <select
+                  id="type-filter"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="all">All Types</option>
+                  <option value="deposit">Deposit</option>
+                  <option value="withdrawal">Withdrawal</option>
+                  <option value="buy_gold">Buy Gold</option>
+                  <option value="sell_gold">Sell Gold</option>
+                </select>
+              </div>
+            )}
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setTypeFilter('all');
+                }}
+                className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Transactions Table */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-soft overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transaction
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  {activeTab === 'withdrawals' && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fee
+                    </th>
+                  )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {activeTab === 'transactions' && filteredTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {getTransactionIcon(transaction.type)}
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {transaction.description || transaction.type.replace('_', ' ')}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            ID: {transaction.id}
                           </div>
                         </div>
-                        <div className="table-cell">
-                          <span className="currency-badge">{transaction.currency}</span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="amount-text">
-                            {formatAmount(transaction.amount, transaction.currency)}
-                          </span>
-                        </div>
-                        <div className="table-cell">
-                          {getStatusBadge(transaction.status)}
-                        </div>
-                        <div className="table-cell">
-                          <span className="date-text">{formatDate(transaction.created_at)}</span>
-                        </div>
-                        <div className="table-cell">
-                          {transaction.transaction_hash ? (
-                            <span className="hash-text">
-                              {transaction.transaction_hash.substring(0, 10)}...
-                            </span>
-                          ) : (
-                            <span className="no-hash">-</span>
-                          )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.user_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {transaction.currency === 'USD' || transaction.currency === 'USDT' 
+                          ? formatCurrency(transaction.amount)
+                          : formatCrypto(transaction.amount, transaction.currency)
+                        }
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(transaction.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(transaction.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button className="text-primary-600 hover:text-primary-900 mr-4">
+                        View
+                      </button>
+                      {transaction.transaction_hash && (
+                        <a
+                          href={`https://etherscan.io/tx/${transaction.transaction_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Explorer
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                
+                {activeTab === 'withdrawals' && filteredWithdrawals.map((withdrawal) => (
+                  <tr key={withdrawal.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {getTransactionIcon('withdrawal')}
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            Withdrawal
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            ID: {withdrawal.id}
+                          </div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="no-data">
-                      <div className="no-data-icon">📊</div>
-                      <h3>No transactions found</h3>
-                      <p>No transactions have been recorded yet</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Withdrawals Tab */}
-        {activeTab === 'withdrawals' && (
-          <div className="tab-content">
-            <div className="withdrawals-table-container">
-              {loading ? (
-                <div className="loading-state">
-                  <div className="loading-spinner"></div>
-                  <p>Loading withdrawal requests...</p>
-                </div>
-              ) : (
-                <div className="withdrawals-table">
-                  <div className="table-header">
-                    <div className="table-cell">User</div>
-                    <div className="table-cell">Currency</div>
-                    <div className="table-cell">Amount</div>
-                    <div className="table-cell">Fee</div>
-                    <div className="table-cell">Net Amount</div>
-                    <div className="table-cell">Destination</div>
-                    <div className="table-cell">Status</div>
-                    <div className="table-cell">Date</div>
-                    <div className="table-cell">Actions</div>
-                  </div>
-                  
-                  {withdrawals.length > 0 ? (
-                    withdrawals.map((withdrawal) => (
-                      <div key={withdrawal.id} className="table-row">
-                        <div className="table-cell">
-                          <span className="user-id">User #{withdrawal.user_id ? withdrawal.user_id.substring(0, 8) : 'N/A'}</span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="currency-badge">{withdrawal.currency}</span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="amount-text">
-                            {formatAmount(withdrawal.amount || 0, withdrawal.currency || 'USD')}
-                          </span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="fee-text">
-                            {formatAmount(withdrawal.fee || 0, withdrawal.currency || 'USD')}
-                          </span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="net-amount-text">
-                            {formatAmount(withdrawal.net_amount || 0, withdrawal.currency || 'USD')}
-                          </span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="address-text">
-                            {withdrawal.destination_address ? withdrawal.destination_address.substring(0, 12) + '...' : 'N/A'}
-                          </span>
-                        </div>
-                        <div className="table-cell">
-                          {getStatusBadge(withdrawal.status)}
-                        </div>
-                        <div className="table-cell">
-                          <span className="date-text">{formatDate(withdrawal.created_at)}</span>
-                        </div>
-                        <div className="table-cell">
-                          {withdrawal.status === 'pending' && (
-                            <div className="action-buttons">
-                              <button 
-                                className="action-btn approve-btn"
-                                onClick={() => handleApproveWithdrawal(withdrawal.id)}
-                                disabled={processingId === withdrawal.id}
-                              >
-                                {processingId === withdrawal.id ? 'Processing...' : 'Approve'}
-                              </button>
-                              <button 
-                                className="action-btn reject-btn"
-                                onClick={() => handleRejectWithdrawal(withdrawal.id)}
-                                disabled={processingId === withdrawal.id}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {withdrawal.user_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {formatCrypto(withdrawal.amount, withdrawal.currency)}
                       </div>
-                    ))
-                  ) : (
-                    <div className="no-data">
-                      <div className="no-data-icon">💸</div>
-                      <h3>No withdrawal requests</h3>
-                      <p>No pending withdrawal requests found</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                      <div className="text-xs text-gray-500">
+                        Net: {formatCrypto(withdrawal.net_amount, withdrawal.currency)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(withdrawal.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(withdrawal.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCrypto(withdrawal.fee, withdrawal.currency)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button className="text-primary-600 hover:text-primary-900 mr-4">
+                        View
+                      </button>
+                      {withdrawal.status === 'pending' && (
+                        <button
+                          onClick={() => processWithdrawal(withdrawal.id)}
+                          disabled={processingId === withdrawal.id}
+                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                        >
+                          {processingId === withdrawal.id ? 'Processing...' : 'Process'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Stats */}
-        <div className="stats-section">
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <h3>Total Transactions</h3>
-              <p>{transactions.length}</p>
+          {/* Empty State */}
+          {(activeTab === 'transactions' && filteredTransactions.length === 0) || 
+           (activeTab === 'withdrawals' && filteredWithdrawals.length === 0) ? (
+            <div className="text-center py-12">
+              <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
+              <p className="text-gray-500">No transactions match your current filters.</p>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">💸</div>
-            <div className="stat-content">
-              <h3>Pending Withdrawals</h3>
-              <p>{withdrawals.filter(w => w.status === 'pending').length}</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>Completed Today</h3>
-              <p>{transactions.filter(t => t.status === 'completed').length}</p>
-            </div>
-          </div>
+          ) : null}
         </div>
       </div>
-
-      <style jsx>{`
-        .transactions-management {
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-        }
-
-        .tabs-section {
-          display: flex;
-          gap: 0.5rem;
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 0.5rem;
-        }
-
-        .tab-button {
-          flex: 1;
-          padding: 1rem 1.5rem;
-          background: transparent;
-          border: none;
-          border-radius: 8px;
-          color: #CCCCCC;
-          font-size: 1rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-        }
-
-        .tab-button:hover {
-          background: rgba(255, 215, 0, 0.1);
-          color: #FFD700;
-        }
-
-        .tab-button.active {
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          color: #1A1A1A;
-          font-weight: 600;
-        }
-
-        .tab-content {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          overflow: hidden;
-        }
-
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-        }
-
-        .loading-spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #333;
-          border-top: 3px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 1rem;
-        }
-
-        .transactions-table,
-        .withdrawals-table {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .table-header {
-          display: grid;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          background: #1A1A1A;
-          border-bottom: 1px solid #333;
-          font-weight: 600;
-          color: #FFD700;
-        }
-
-        .transactions-table .table-header {
-          grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1.5fr 1.5fr;
-        }
-
-        .withdrawals-table .table-header {
-          grid-template-columns: 1fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1fr 1.5fr 1.5fr;
-        }
-
-        .table-row {
-          display: grid;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #333;
-          align-items: center;
-          transition: background 0.3s ease;
-        }
-
-        .transactions-table .table-row {
-          grid-template-columns: 1.5fr 1fr 1.5fr 1fr 1.5fr 1.5fr;
-        }
-
-        .withdrawals-table .table-row {
-          grid-template-columns: 1fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1fr 1.5fr 1.5fr;
-        }
-
-        .table-row:hover {
-          background: rgba(255, 215, 0, 0.05);
-        }
-
-        .table-row:last-child {
-          border-bottom: none;
-        }
-
-        .table-cell {
-          display: flex;
-          align-items: center;
-        }
-
-        .transaction-type {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .type-icon {
-          font-size: 1.2rem;
-        }
-
-        .type-text {
-          font-weight: 500;
-          color: white;
-          text-transform: capitalize;
-        }
-
-        .currency-badge {
-          background: #333;
-          color: #FFD700;
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-
-        .amount-text {
-          color: white;
-          font-weight: 500;
-        }
-
-        .fee-text {
-          color: #FFA500;
-          font-weight: 500;
-        }
-
-        .net-amount-text {
-          color: #4CAF50;
-          font-weight: 600;
-        }
-
-        .status-badge {
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-
-        .date-text {
-          color: #CCCCCC;
-          font-size: 0.9rem;
-        }
-
-        .hash-text {
-          color: #4CAF50;
-          font-family: monospace;
-          font-size: 0.85rem;
-        }
-
-        .no-hash {
-          color: #666;
-          font-style: italic;
-        }
-
-        .user-id {
-          color: #CCCCCC;
-          font-family: monospace;
-          font-size: 0.9rem;
-        }
-
-        .address-text {
-          color: #4CAF50;
-          font-family: monospace;
-          font-size: 0.85rem;
-        }
-
-        .action-buttons {
-          display: flex;
-          gap: 0.5rem;
-        }
-
-        .action-btn {
-          padding: 0.5rem 1rem;
-          border: none;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          white-space: nowrap;
-        }
-
-        .action-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .approve-btn {
-          background: #4CAF50;
-          color: white;
-        }
-
-        .approve-btn:hover:not(:disabled) {
-          background: #45a049;
-        }
-
-        .reject-btn {
-          background: #f44336;
-          color: white;
-        }
-
-        .reject-btn:hover:not(:disabled) {
-          background: #da190b;
-        }
-
-        .no-data {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-          text-align: center;
-        }
-
-        .no-data-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .no-data h3 {
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .no-data p {
-          margin: 0;
-        }
-
-        .stats-section {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
-        }
-
-        .stat-card {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .stat-icon {
-          width: 50px;
-          height: 50px;
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          color: #1A1A1A;
-        }
-
-        .stat-content h3 {
-          font-size: 0.9rem;
-          color: #CCCCCC;
-          margin: 0 0 0.5rem 0;
-          font-weight: 500;
-        }
-
-        .stat-content p {
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-          .tabs-section {
-            flex-direction: column;
-          }
-          
-          .transactions-table .table-header,
-          .transactions-table .table-row,
-          .withdrawals-table .table-header,
-          .withdrawals-table .table-row {
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-          }
-          
-          .table-cell {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.25rem;
-          }
-          
-          .action-buttons {
-            flex-direction: column;
-          }
-          
-          .stats-section {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
     </AdminLayout>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
+import { formatCurrency, formatNumber, formatCrypto } from '@/lib/formatters';
 
 interface User {
   id: number;
@@ -13,48 +14,33 @@ interface User {
   role: string;
 }
 
-interface DepositForm {
-  amount: string;
-  walletAddress: string;
-  shippingInfo: string;
-}
-
-interface WithdrawalForm {
-  amount: string;
-  walletAddress: string;
-  shippingAddress: string;
+interface Transaction {
+  id: string;
+  type: 'deposit' | 'withdrawal' | 'buy_gold' | 'sell_gold' | 'exchange';
+  amount: number;
+  currency: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  timestamp: string;
+  description: string;
+  transactionHash?: string;
+  fee?: number;
 }
 
 export default function TransactionsPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  
-  // Deposit state
-  const [depositTab, setDepositTab] = useState<'crypto' | 'gold'>('crypto');
-  const [depositForm, setDepositForm] = useState<DepositForm>({
-    amount: '',
-    walletAddress: '',
-    shippingInfo: ''
-  });
-  const [depositLoading, setDepositLoading] = useState(false);
-  
-  // Withdrawal state
-  const [withdrawalTab, setWithdrawalTab] = useState<'crypto' | 'gold'>('crypto');
-  const [withdrawalForm, setWithdrawalForm] = useState<WithdrawalForm>({
-    amount: '',
-    walletAddress: '',
-    shippingAddress: ''
-  });
-  const [withdrawalLoading, setWithdrawalLoading] = useState(false);
-  
-  // Status filters
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'processing' | 'completed'>('pending');
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const router = useRouter();
 
   useEffect(() => {
     checkAuthentication();
+    loadTransactions();
   }, []);
 
   // Close dropdown when clicking outside
@@ -102,17 +88,78 @@ export default function TransactionsPage() {
       Cookies.remove('authToken');
       sessionStorage.removeItem('authToken');
       router.push('/login');
+    }
+  };
+
+  const loadTransactions = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.get('/api/transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Transform the data to match our interface
+      const transformedTransactions: Transaction[] = (response.data || []).map((tx: any) => ({
+        id: tx.id || tx.transactionId || `tx-${Math.random().toString(36).substr(2, 9)}`,
+        type: tx.type || 'deposit',
+        amount: tx.amount || tx.value || 0,
+        currency: tx.currency || tx.symbol || 'USD',
+        status: tx.status || 'pending',
+        timestamp: tx.timestamp || tx.createdAt || new Date().toISOString(),
+        description: tx.description || tx.memo || `${tx.type} transaction`,
+        transactionHash: tx.transactionHash || tx.hash,
+        fee: tx.fee || 0
+      }));
+      
+      setTransactions(transformedTransactions);
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      // Set mock data if API fails
+      setTransactions([
+        {
+          id: 'tx-1',
+          type: 'buy_gold',
+          amount: 0.5,
+          currency: 'ETH',
+          status: 'completed',
+          timestamp: new Date(Date.now() - 86400000).toISOString(),
+          description: 'Bought 0.5g gold with 0.001 ETH',
+          fee: 0.0001
+        },
+        {
+          id: 'tx-2',
+          type: 'deposit',
+          amount: 0.01,
+          currency: 'BTC',
+          status: 'completed',
+          timestamp: new Date(Date.now() - 172800000).toISOString(),
+          description: 'Deposited 0.01 BTC to wallet',
+          transactionHash: '0x1234...5678'
+        },
+        {
+          id: 'tx-3',
+          type: 'sell_gold',
+          amount: 0.25,
+          currency: 'USDT',
+          status: 'pending',
+          timestamp: new Date(Date.now() - 259200000).toISOString(),
+          description: 'Sold 0.25g gold for USDT',
+          fee: 2.5
+        }
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = async () => {
+  const handleLogout = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      if (token) {
       await api.post('/api/auth/logout', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -122,165 +169,161 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleDepositChange = (field: keyof DepositForm, value: string) => {
-    setDepositForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         transaction.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
+    const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
 
-  const handleWithdrawalChange = (field: keyof WithdrawalForm, value: string) => {
-    setWithdrawalForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleDeposit = async () => {
-    if (!depositForm.amount || !depositForm.walletAddress) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    setDepositLoading(true);
-    try {
-      const response = await api.post('/api/wallet/deposit', {
-        currency: depositTab === 'crypto' ? 'USDT' : 'GOLD',
-        amount: parseFloat(depositForm.amount),
-        walletAddress: depositForm.walletAddress,
-        shippingInfo: depositForm.shippingInfo
-      });
-
-      alert('Deposit request submitted successfully!');
-      setDepositForm({ amount: '', walletAddress: '', shippingInfo: '' });
-    } catch (error) {
-      console.error('Deposit error:', error);
-      alert('Failed to submit deposit request');
-    } finally {
-      setDepositLoading(false);
-    }
-  };
-
-  const handleWithdrawal = async () => {
-    if (!withdrawalForm.amount || !withdrawalForm.walletAddress) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    setWithdrawalLoading(true);
-    try {
-      const response = await api.post('/api/wallet/withdrawal', {
-        currency: withdrawalTab === 'crypto' ? 'USDT' : 'GOLD',
-        amount: parseFloat(withdrawalForm.amount),
-        destinationAddress: withdrawalForm.walletAddress,
-        shippingAddress: withdrawalForm.shippingAddress
-      });
-
-      alert('Withdrawal request submitted successfully!');
-      setWithdrawalForm({ amount: '', walletAddress: '', shippingAddress: '' });
-    } catch (error) {
-      console.error('Withdrawal error:', error);
-      alert('Failed to submit withdrawal request');
-    } finally {
-      setWithdrawalLoading(false);
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case 'deposit':
+        return (
+          <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+        );
+      case 'withdrawal':
+        return (
+          <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </div>
+        );
+      case 'buy_gold':
+        return (
+          <div className="h-8 w-8 bg-yellow-100 rounded-full flex items-center justify-center">
+            <span className="text-yellow-600 text-sm">🥇</span>
+          </div>
+        );
+      case 'sell_gold':
+        return (
+          <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+            <span className="text-orange-600 text-sm">💰</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </div>
+        );
     }
   };
 
-  if (!user) {
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      processing: { color: 'bg-blue-100 text-blue-800', label: 'Processing' },
+      completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+      failed: { color: 'bg-red-100 text-red-800', label: 'Failed' }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    
     return (
-      <div className="transactions-loading">
-        <div className="loading-spinner"></div>
+      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="transactions-page">
-      {/* Sidebar Navigation */}
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <div className="logo">
-            <div className="logo-icon">GC</div>
-            <span className="logo-text">UOB Security House</span>
-          </div>
-        </div>
-        
-        <nav className="sidebar-nav">
-          <Link href="/" className="nav-item">
-            <div className="nav-icon">🏠</div>
-            <span>Dashboard</span>
-          </Link>
-          <Link href="/wallet" className="nav-item">
-            <div className="nav-icon">💰</div>
-            <span>Wallet</span>
-          </Link>
-          <Link href="/exchange" className="nav-item">
-            <div className="nav-icon">🔁</div>
-            <span>Exchange</span>
-          </Link>
-          <Link href="/skrs" className="nav-item">
-            <div className="nav-icon">📄</div>
-            <span>SKRs</span>
-          </Link>
-          <Link href="/transactions" className="nav-item active">
-            <div className="nav-icon">📊</div>
-            <span>Transactions</span>
-          </Link>
-        </nav>
-      </div>
+    <div className="min-h-screen bg-white">
+      {/* Top Navigation Bar */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center space-x-3">
+                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">U</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
+                  <p className="text-xs text-gray-500">Secure Gold Trading</p>
+                </div>
+              </Link>
+            </div>
 
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Header */}
-        <div className="header">
-          <div className="header-left">
-            <div className="logo-small">
-              <div className="logo-shield">GC</div>
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                Dashboard
+              </Link>
+              <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                SKRs
+              </Link>
+              <Link href="/transactions" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
+                Transactions
+              </Link>
+              <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                Exchange
+              </Link>
             </div>
-          </div>
-          <div className="header-right">
-            <div className="status-filters">
-              <button 
-                className={`status-btn ${statusFilter === 'pending' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('pending')}
+
+            {/* User Profile */}
+            <div className="relative user-profile">
+              <button
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="flex items-center space-x-3 text-sm rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors duration-200"
               >
-                Pending
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-primary-600 font-medium text-sm">
+                    {user?.fullName?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium text-gray-900">{user?.fullName}</div>
+                  <div className="text-xs text-gray-500">{user?.role}</div>
+                </div>
+                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-              <button 
-                className={`status-btn ${statusFilter === 'processing' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('processing')}
-              >
-                Processing
-              </button>
-              <button 
-                className={`status-btn ${statusFilter === 'completed' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('completed')}
-              >
-                Completed
-              </button>
-            </div>
-            <div 
-              className="user-profile"
-              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-            >
-              <div className="profile-pic">{user.fullName.charAt(0)}</div>
-              <span>{user.fullName}</span>
-              <div className="dropdown">▼</div>
-              
+
               {showProfileDropdown && (
-                <div className="profile-dropdown">
-                  <div className="dropdown-item">
-                    <span>👤</span> Profile
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
                   </div>
-                  <div className="dropdown-item">
-                    <span>⚙️</span> Settings
+                  <div className="py-1">
+                    <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      Profile Settings
+                    </Link>
+                    <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      Account Settings
+                    </Link>
                   </div>
-                  <div className="dropdown-item">
-                    <span>📊</span> Analytics
-                  </div>
-                  <div className="dropdown-divider"></div>
-                  <div className="dropdown-item" onClick={logout}>
-                    <span>🚪</span> Logout
+                  <div className="border-t border-gray-200 py-1">
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Sign out
+                    </button>
                   </div>
                 </div>
               )}
@@ -288,643 +331,308 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* Transactions Content */}
-        <div className="transactions-content">
-          <div className="panels-container">
-            {/* Deposits Panel */}
-            <div className="deposits-panel">
-              <h2 className="panel-title">Deposits</h2>
-              
-              {/* Tabs */}
-              <div className="tabs">
-                <button 
-                  className={`tab ${depositTab === 'crypto' ? 'active' : ''}`}
-                  onClick={() => setDepositTab('crypto')}
-                >
-                  Crypto
-                </button>
-                <button 
-                  className={`tab ${depositTab === 'gold' ? 'active' : ''}`}
-                  onClick={() => setDepositTab('gold')}
-                >
-                  Gold
-                </button>
-              </div>
+        {/* Mobile Navigation */}
+        <div className="md:hidden border-t border-gray-200 bg-gray-50">
+          <div className="px-4 py-2 space-y-1">
+            <Link href="/" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              Dashboard
+            </Link>
+            <Link href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              SKRs
+            </Link>
+            <Link href="/transactions" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
+              Transactions
+            </Link>
+            <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              Exchange
+            </Link>
+          </div>
+        </div>
+      </nav>
 
-              {/* Form Fields */}
-              <div className="form-fields">
-                <div className="field-group">
-                  <label className="field-label">Deposit Monib</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="121355443444#@/00no"
-                      value={depositForm.amount}
-                      onChange={(e) => handleDepositChange('amount', e.target.value)}
-                    />
-                    <span className="field-tag">#121112</span>
-                  </div>
-                </div>
-
-                <div className="field-group">
-                  <label className="field-label">Wallet address</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="Crypoto"
-                      value={depositForm.walletAddress}
-                      onChange={(e) => handleDepositChange('walletAddress', e.target.value)}
-                    />
-                    <span className="field-tag">Cryptto</span>
-                  </div>
-                </div>
-
-                <div className="field-group">
-                  <label className="field-label">Shipping Informe Insput</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="Shipping information"
-                      value={depositForm.shippingInfo}
-                      onChange={(e) => handleDepositChange('shippingInfo', e.target.value)}
-                    />
-                    <span className="field-tag">Gold</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Deposit Button */}
-              <button 
-                className="deposit-btn"
-                onClick={handleDeposit}
-                disabled={depositLoading}
-              >
-                {depositLoading ? 'Processing...' : 'Deposit'}
-              </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">Transaction History</h2>
+              <p className="mt-2 text-gray-600">View and track all your transactions</p>
             </div>
+            <Link
+              href="/exchange"
+              className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+            >
+              New Transaction
+            </Link>
+          </div>
+        </div>
 
-            {/* Withdrawals Panel */}
-            <div className="withdrawals-panel">
-              {/* Tabs */}
-              <div className="tabs">
-                <button 
-                  className={`tab ${withdrawalTab === 'crypto' ? 'active' : ''}`}
-                  onClick={() => setWithdrawalTab('crypto')}
-                >
-                  Crypto
-                </button>
-                <button 
-                  className={`tab ${withdrawalTab === 'gold' ? 'active' : ''}`}
-                  onClick={() => setWithdrawalTab('gold')}
-                >
-                  Gold
-                </button>
+        {/* Transaction Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                <p className="text-2xl font-bold text-gray-900">{transactions.length}</p>
               </div>
-
-              {/* Form Fields */}
-              <div className="form-fields">
-                <div className="field-group">
-                  <label className="field-label">Jetabain Mono</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="Jet3535434ant/@Mono"
-                      value={withdrawalForm.amount}
-                      onChange={(e) => handleWithdrawalChange('amount', e.target.value)}
-                    />
-                    <span className="field-tag">#12112</span>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
                   </div>
                 </div>
 
-                <div className="field-group">
-                  <label className="field-label">Wallet address</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="12335434444@00no"
-                      value={withdrawalForm.walletAddress}
-                      onChange={(e) => handleWithdrawalChange('walletAddress', e.target.value)}
-                    />
-                    <span className="field-tag">#12112</span>
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {transactions.filter(tx => tx.status === 'completed').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
                   </div>
                 </div>
 
-                <div className="field-group">
-                  <label className="field-label">Shipping address</label>
-                  <div className="input-container">
-                    <input 
-                      type="text" 
-                      className="form-input"
-                      placeholder="Shipping address"
-                      value={withdrawalForm.shippingAddress}
-                      onChange={(e) => handleWithdrawalChange('shippingAddress', e.target.value)}
-                    />
-                    <span className="field-tag">#DA73</span>
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {transactions.filter(tx => tx.status === 'pending').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                   </div>
                 </div>
               </div>
 
-              {/* Withdraw Button */}
-              <button 
-                className="withdraw-btn"
-                onClick={handleWithdrawal}
-                disabled={withdrawalLoading}
-              >
-                {withdrawalLoading ? 'Processing...' : 'Withdraw'}
-              </button>
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Failed</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {transactions.filter(tx => tx.status === 'failed').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-red-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Filters */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                Search
+              </label>
+              <input
+                type="text"
+                id="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search transactions..."
+              />
+            </div>
+            <div>
+              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Type
+              </label>
+              <select
+                id="type-filter"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Types</option>
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+                <option value="buy_gold">Buy Gold</option>
+                <option value="sell_gold">Sell Gold</option>
+                <option value="exchange">Exchange</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button 
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                  setTypeFilter('all');
+                }}
+                className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+                  </div>
+                </div>
+
+        {/* Transactions Table */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-soft overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transaction
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {getTransactionIcon(transaction.type)}
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {transaction.description}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            ID: {transaction.id}
+                          </div>
+                  </div>
+                </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900 capitalize">
+                        {transaction.type.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {transaction.currency === 'USD' || transaction.currency === 'USDT' 
+                          ? formatCurrency(transaction.amount)
+                          : formatCrypto(transaction.amount, transaction.currency)
+                        }
+                      </div>
+                      {transaction.fee && transaction.fee > 0 && (
+                        <div className="text-xs text-gray-500">
+                          Fee: {formatCurrency(transaction.fee)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(transaction.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(transaction.timestamp).toLocaleDateString()}
+                      <div className="text-xs text-gray-500">
+                        {new Date(transaction.timestamp).toLocaleTimeString()}
+                  </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button className="text-primary-600 hover:text-primary-900 mr-4">
+                        View
+                      </button>
+                      {transaction.transactionHash && (
+                        <a
+                          href={`https://etherscan.io/tx/${transaction.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Explorer
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+                </div>
+
+          {/* Empty State */}
+          {paginatedTransactions.length === 0 && (
+            <div className="text-center py-12">
+              <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
+              <p className="text-gray-500 mb-4">You haven't made any transactions yet.</p>
+              <Link
+                href="/exchange"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700"
+              >
+                Start Trading
+              </Link>
+            </div>
+          )}
+              </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} results
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button 
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-
-      <style jsx>{`
-        .transactions-page {
-          display: flex;
-          min-height: 100vh;
-          background: #1A1A1A;
-          color: white;
-          font-family: 'Arial', sans-serif;
-        }
-
-        .sidebar {
-          width: 250px;
-          background: #2C2C2C;
-          padding: 2rem 0;
-          border-right: 1px solid #444;
-        }
-
-        .sidebar-header {
-          padding: 0 2rem 2rem;
-          border-bottom: 1px solid #444;
-        }
-
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .logo-icon {
-          width: 40px;
-          height: 40px;
-          background: linear-gradient(45deg, #FFD700, #B8860B);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 1.2rem;
-          color: white;
-        }
-
-        .logo-text {
-          font-size: 1.1rem;
-          font-weight: bold;
-          color: #FFD700;
-        }
-
-        .sidebar-nav {
-          padding: 2rem 0;
-        }
-
-        .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem 2rem;
-          color: white;
-          text-decoration: none;
-          transition: all 0.3s ease;
-          border-left: 4px solid transparent;
-        }
-
-        .nav-item:hover {
-          background: #3A3A3A;
-        }
-
-        .nav-item.active {
-          background: linear-gradient(90deg, #00C853, #2C2C2C);
-          border-left-color: #00C853;
-          color: white;
-        }
-
-        .nav-icon {
-          font-size: 1.2rem;
-          width: 24px;
-          text-align: center;
-        }
-
-        .main-content {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .header {
-          background: #2C2C2C;
-          padding: 1rem 2rem;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid #444;
-        }
-
-        .header-left {
-          display: flex;
-          align-items: center;
-        }
-
-        .logo-small {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .logo-shield {
-          width: 32px;
-          height: 32px;
-          background: linear-gradient(45deg, #FFD700, #B8860B);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 0.9rem;
-          color: white;
-        }
-
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 2rem;
-        }
-
-        .status-filters {
-          display: flex;
-          gap: 0.5rem;
-        }
-
-        .status-btn {
-          background: #3A3A3A;
-          color: white;
-          border: none;
-          border-radius: 20px;
-          padding: 0.5rem 1rem;
-          font-size: 0.9rem;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .status-btn.active {
-          background: #FFD700;
-          color: #1A1A1A;
-        }
-
-        .status-btn:hover:not(.active) {
-          background: #4A4A4A;
-        }
-
-        .user-profile {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          cursor: pointer;
-          position: relative;
-        }
-
-        .profile-pic {
-          width: 32px;
-          height: 32px;
-          background: #FFD700;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.2rem;
-          color: white;
-          font-weight: bold;
-        }
-
-        .dropdown {
-          color: #888;
-          font-size: 0.8rem;
-        }
-
-        .profile-dropdown {
-          position: absolute;
-          top: 100%;
-          right: 0;
-          background: #2C2C2C;
-          border: 1px solid #444;
-          border-radius: 8px;
-          padding: 0.5rem 0;
-          min-width: 200px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-          z-index: 1000;
-        }
-
-        .dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1rem;
-          color: white;
-          cursor: pointer;
-          transition: background 0.3s ease;
-        }
-
-        .dropdown-item:hover {
-          background: #3A3A3A;
-        }
-
-        .dropdown-item span {
-          font-size: 1rem;
-        }
-
-        .dropdown-divider {
-          height: 1px;
-          background: #444;
-          margin: 0.5rem 0;
-        }
-
-        .transactions-content {
-          flex: 1;
-          padding: 2rem;
-        }
-
-        .panels-container {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 2rem;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .deposits-panel,
-        .withdrawals-panel {
-          background: #2C2C2C;
-          border-radius: 15px;
-          padding: 2rem;
-          border: 1px solid #444;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .panel-title {
-          font-size: 1.8rem;
-          font-weight: bold;
-          color: #D6DEE2;
-          margin-bottom: 1.5rem;
-        }
-
-        .tabs {
-          display: flex;
-          gap: 0.5rem;
-          margin-bottom: 2rem;
-        }
-
-        .tab {
-          background: transparent;
-          color: #888;
-          border: none;
-          border-bottom: 2px solid transparent;
-          padding: 0.75rem 1.5rem;
-          font-size: 1rem;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .tab.active {
-          color: #FFD700;
-          border-bottom-color: #FFD700;
-        }
-
-        .tab:hover:not(.active) {
-          color: white;
-        }
-
-        .form-fields {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-          margin-bottom: 2rem;
-        }
-
-        .field-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .field-label {
-          color: #D6DEE2;
-          font-weight: bold;
-          font-size: 1rem;
-        }
-
-        .input-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .form-input {
-          flex: 1;
-          background: #3A3A3A;
-          border: 1px solid #555;
-          border-radius: 8px;
-          padding: 1rem;
-          color: white;
-          font-size: 1rem;
-          outline: none;
-          transition: border-color 0.3s ease;
-        }
-
-        .form-input:focus {
-          border-color: #FFD700;
-        }
-
-        .form-input::placeholder {
-          color: #888;
-        }
-
-        .field-tag {
-          position: absolute;
-          right: 1rem;
-          color: #FFD700;
-          font-weight: bold;
-          font-size: 0.9rem;
-          background: rgba(255, 215, 0, 0.1);
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-        }
-
-        .deposit-btn {
-          width: 100%;
-          background: linear-gradient(180deg, #FFD700, #B8860B);
-          color: white;
-          border: none;
-          border-radius: 12px;
-          padding: 1.25rem;
-          font-size: 1.2rem;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-        }
-
-        .deposit-btn:hover:not(:disabled) {
-          background: linear-gradient(180deg, #FFE55C, #D4AF37);
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
-        }
-
-        .deposit-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        .withdraw-btn {
-          width: 100%;
-          background: linear-gradient(180deg, #00C853, #00A047);
-          color: white;
-          border: none;
-          border-radius: 12px;
-          padding: 1.25rem;
-          font-size: 1.2rem;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(0, 200, 83, 0.3);
-        }
-
-        .withdraw-btn:hover:not(:disabled) {
-          background: linear-gradient(180deg, #00E676, #00C853);
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(0, 200, 83, 0.4);
-        }
-
-        .withdraw-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        .transactions-loading {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          background: #1A1A1A;
-        }
-
-        .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid #333;
-          border-top: 4px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 1024px) {
-          .panels-container {
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .transactions-page {
-            flex-direction: column;
-          }
-          
-          .sidebar {
-            width: 100%;
-            height: auto;
-            padding: 1rem 0;
-            border-right: none;
-            border-bottom: 1px solid #444;
-          }
-          
-          .sidebar-nav {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            padding: 1rem 0;
-          }
-          
-          .nav-item {
-            padding: 0.75rem 1rem;
-            border-left: none;
-            border-bottom: 3px solid transparent;
-            min-width: 120px;
-            justify-content: center;
-          }
-          
-          .nav-item.active {
-            background: transparent;
-            border-bottom-color: #00C853;
-            border-left: none;
-          }
-          
-          .main-content {
-            flex: 1;
-          }
-          
-          .header {
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1rem;
-          }
-          
-          .header-left,
-          .header-center,
-          .header-right {
-            width: 100%;
-          }
-          
-          .search-input {
-            width: 100%;
-          }
-          
-          .header-icons {
-            justify-content: center;
-          }
-          
-          .user-profile {
-            justify-content: center;
-            margin-top: 1rem;
-          }
-          
-          .transactions-content {
-            padding: 1rem;
-          }
-          
-          .status-filters {
-            justify-content: center;
-          }
-
-          .transactions-content {
-            padding: 1rem;
-          }
-
-          .deposits-panel,
-          .withdrawals-panel {
-            padding: 1.5rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

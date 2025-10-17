@@ -11,6 +11,7 @@ interface User {
   role: string;
   created_at: string;
   last_login: string;
+  is_active?: boolean;
 }
 
 export default function AdminUsers() {
@@ -18,6 +19,9 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showUserModal, setShowUserModal] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -38,7 +42,26 @@ export default function AdminUsers() {
           email: 'admin@uobsecurity.com',
           role: 'admin',
           created_at: new Date().toISOString(),
-          last_login: new Date().toISOString()
+          last_login: new Date().toISOString(),
+          is_active: true
+        },
+        {
+          id: '2',
+          full_name: 'John Doe',
+          email: 'john@example.com',
+          role: 'user',
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+          last_login: new Date(Date.now() - 3600000).toISOString(),
+          is_active: true
+        },
+        {
+          id: '3',
+          full_name: 'Jane Smith',
+          email: 'jane@example.com',
+          role: 'user',
+          created_at: new Date(Date.now() - 172800000).toISOString(),
+          last_login: new Date(Date.now() - 7200000).toISOString(),
+          is_active: false
         }
       ]);
     } finally {
@@ -52,445 +75,354 @@ export default function AdminUsers() {
     const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && user.is_active) ||
+                         (statusFilter === 'inactive' && !user.is_active);
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
   const getRoleBadge = (role: string) => {
-    const roleStyles = {
-      admin: { bg: '#FFD700', color: '#1A1A1A', text: 'Admin' },
-      user: { bg: '#4CAF50', color: 'white', text: 'User' }
-    };
-    
-    const style = roleStyles[role as keyof typeof roleStyles] || roleStyles.user;
-    
+    if (role === 'admin') {
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+          Admin
+        </span>
+      );
+    }
     return (
-      <span 
-        className="role-badge"
-        style={{ backgroundColor: style.bg, color: style.color }}
-      >
-        {style.text}
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+        User
       </span>
     );
   };
 
+  const getStatusBadge = (isActive: boolean) => {
+    if (isActive) {
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+          Active
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+        Inactive
+      </span>
+    );
+  };
+
+  const openUserModal = (user: User) => {
+    setSelectedUser(user);
+    setShowUserModal(true);
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <AdminLayout title="User Management" subtitle="Manage platform users and their roles">
-      <div className="users-management">
-        {/* Filters */}
-        <div className="filters-section">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <div className="search-icon">🔍</div>
+    <AdminLayout>
+      <div>
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="mt-2 text-gray-600">Manage platform users and their roles</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+            </div>
           </div>
-          
-          <div className="filter-select">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="role-filter"
-            >
-              <option value="all">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="user">User</option>
-            </select>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Users</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {users.filter(u => u.is_active).length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Admin Users</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {users.filter(u => u.role === 'admin').length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">New This Month</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {users.filter(u => {
+                    const createdDate = new Date(u.created_at);
+                    const now = new Date();
+                    const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                    return createdDate >= monthAgo;
+                  }).length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-orange-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                Search Users
+              </label>
+              <input
+                type="text"
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search by name or email..."
+              />
+            </div>
+            <div>
+              <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Role
+              </label>
+              <select
+                id="role-filter"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setRoleFilter('all');
+                  setStatusFilter('all');
+                }}
+                className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              >
+                Clear Filters
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Users Table */}
-        <div className="users-table-container">
-          {loading ? (
-            <div className="loading-state">
-              <div className="loading-spinner"></div>
-              <p>Loading users...</p>
-            </div>
-          ) : (
-            <div className="users-table">
-              <div className="table-header">
-                <div className="table-cell">Name</div>
-                <div className="table-cell">Email</div>
-                <div className="table-cell">Role</div>
-                <div className="table-cell">Joined</div>
-                <div className="table-cell">Last Login</div>
-                <div className="table-cell">Actions</div>
-              </div>
-              
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <div key={user.id} className="table-row">
-                    <div className="table-cell">
-                      <div className="user-info">
-                        <div className="user-avatar">👤</div>
-                        <span className="user-name">{user.full_name || 'N/A'}</span>
+        <div className="bg-white border border-gray-200 rounded-xl shadow-soft overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Last Login
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                          <span className="text-primary-600 font-medium text-sm">
+                            {user.full_name?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                          <div className="text-sm text-gray-500">{user.email}</div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="table-cell">
-                      <span className="user-email">{user.email || 'N/A'}</span>
-                    </div>
-                    <div className="table-cell">
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       {getRoleBadge(user.role)}
-                    </div>
-                    <div className="table-cell">
-                      <span className="date-text">{formatDate(user.created_at)}</span>
-                    </div>
-                    <div className="table-cell">
-                      <span className="date-text">{formatDate(user.last_login)}</span>
-                    </div>
-                    <div className="table-cell">
-                      <div className="action-buttons">
-                        <button className="action-btn edit-btn">Edit</button>
-                        <button className="action-btn delete-btn">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-users">
-                  <div className="no-users-icon">👥</div>
-                  <h3>No users found</h3>
-                  <p>No users match your current search criteria</p>
-                </div>
-              )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(user.is_active || false)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(user.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDateTime(user.last_login)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => openUserModal(user)}
+                        className="text-primary-600 hover:text-primary-900 mr-4"
+                      >
+                        View
+                      </button>
+                      <button className="text-blue-600 hover:text-blue-900 mr-4">
+                        Edit
+                      </button>
+                      <button className="text-red-600 hover:text-red-900">
+                        Suspend
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Empty State */}
+          {filteredUsers.length === 0 && (
+            <div className="text-center py-12">
+              <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+              <p className="text-gray-500">No users match your current filters.</p>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Stats */}
-        <div className="users-stats">
-          <div className="stat-card">
-            <div className="stat-icon">👥</div>
-            <div className="stat-content">
-              <h3>Total Users</h3>
-              <p>{users.length}</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">👑</div>
-            <div className="stat-content">
-              <h3>Admins</h3>
-              <p>{users.filter(u => u.role === 'admin').length}</p>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">👤</div>
-            <div className="stat-content">
-              <h3>Regular Users</h3>
-              <p>{users.filter(u => u.role === 'user').length}</p>
+      {/* User Detail Modal */}
+      {showUserModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">User Details</h3>
+                <button
+                  onClick={() => setShowUserModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <p className="text-sm text-gray-900">{selectedUser.full_name}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="text-sm text-gray-900">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <div className="mt-1">
+                    {getRoleBadge(selectedUser.role)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <div className="mt-1">
+                    {getStatusBadge(selectedUser.is_active || false)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Created</label>
+                  <p className="text-sm text-gray-900">{formatDateTime(selectedUser.created_at)}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Last Login</label>
+                  <p className="text-sm text-gray-900">{formatDateTime(selectedUser.last_login)}</p>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex space-x-3">
+                <button className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200">
+                  Edit User
+                </button>
+                <button className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200">
+                  Reset Password
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <style jsx>{`
-        .users-management {
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-        }
-
-        .filters-section {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 1.5rem;
-        }
-
-        .search-box {
-          position: relative;
-          flex: 1;
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 0.75rem 3rem 0.75rem 1rem;
-          background: #1A1A1A;
-          border: 1px solid #444;
-          border-radius: 8px;
-          color: white;
-          font-size: 1rem;
-        }
-
-        .search-input:focus {
-          outline: none;
-          border-color: #FFD700;
-        }
-
-        .search-icon {
-          position: absolute;
-          right: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #CCCCCC;
-        }
-
-        .filter-select {
-          min-width: 150px;
-        }
-
-        .role-filter {
-          width: 100%;
-          padding: 0.75rem 1rem;
-          background: #1A1A1A;
-          border: 1px solid #444;
-          border-radius: 8px;
-          color: white;
-          font-size: 1rem;
-        }
-
-        .role-filter:focus {
-          outline: none;
-          border-color: #FFD700;
-        }
-
-        .users-table-container {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          overflow: hidden;
-        }
-
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-        }
-
-        .loading-spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #333;
-          border-top: 3px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 1rem;
-        }
-
-        .users-table {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .table-header {
-          display: grid;
-          grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          background: #1A1A1A;
-          border-bottom: 1px solid #333;
-          font-weight: 600;
-          color: #FFD700;
-        }
-
-        .table-row {
-          display: grid;
-          grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #333;
-          align-items: center;
-          transition: background 0.3s ease;
-        }
-
-        .table-row:hover {
-          background: rgba(255, 215, 0, 0.05);
-        }
-
-        .table-row:last-child {
-          border-bottom: none;
-        }
-
-        .table-cell {
-          display: flex;
-          align-items: center;
-        }
-
-        .user-info {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-
-        .user-avatar {
-          width: 32px;
-          height: 32px;
-          background: #FFD700;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #1A1A1A;
-          font-weight: bold;
-        }
-
-        .user-name {
-          font-weight: 500;
-          color: white;
-        }
-
-        .user-email {
-          color: #CCCCCC;
-        }
-
-        .role-badge {
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-
-        .date-text {
-          color: #CCCCCC;
-          font-size: 0.9rem;
-        }
-
-        .action-buttons {
-          display: flex;
-          gap: 0.5rem;
-        }
-
-        .action-btn {
-          padding: 0.5rem 1rem;
-          border: none;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .edit-btn {
-          background: #4CAF50;
-          color: white;
-        }
-
-        .edit-btn:hover {
-          background: #45a049;
-        }
-
-        .delete-btn {
-          background: #f44336;
-          color: white;
-        }
-
-        .delete-btn:hover {
-          background: #da190b;
-        }
-
-        .no-users {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-          text-align: center;
-        }
-
-        .no-users-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .no-users h3 {
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .no-users p {
-          margin: 0;
-        }
-
-        .users-stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
-        }
-
-        .stat-card {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .stat-icon {
-          width: 50px;
-          height: 50px;
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          color: #1A1A1A;
-        }
-
-        .stat-content h3 {
-          font-size: 0.9rem;
-          color: #CCCCCC;
-          margin: 0 0 0.5rem 0;
-          font-weight: 500;
-        }
-
-        .stat-content p {
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-          .filters-section {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          
-          .table-header,
-          .table-row {
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-          }
-          
-          .table-cell {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.25rem;
-          }
-          
-          .action-buttons {
-            flex-direction: column;
-          }
-          
-          .users-stats {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
+      )}
     </AdminLayout>
   );
 }

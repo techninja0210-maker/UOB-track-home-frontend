@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
+import Link from 'next/link';
 import Cookies from 'js-cookie';
+import { formatCurrency, formatNumber, formatCrypto, formatCompact } from '@/lib/formatters';
 import api from '@/lib/api';
 
 interface User {
@@ -97,24 +98,14 @@ export default function ExchangePage() {
     }
     
     try {
-      const response = await api.get('/api/prices/exchange/crypto-to-gold', {
-        params: {
-          crypto: buyCurrency,
-          amount: parseFloat(buyAmount)
-        }
+      const response = await api.post('/api/gold-exchange/calculate', {
+        cryptoCurrency: buyCurrency,
+        cryptoAmount: parseFloat(buyAmount)
       });
       
-      setBuyCalculation({
-        cryptoCurrency: buyCurrency,
-        cryptoAmount: parseFloat(buyAmount),
-        cryptoPriceUsd: response.data.cryptoPriceUSD,
-        goldPricePerGram: response.data.goldPricePerGram,
-        goldGrams: response.data.goldGrams,
-        fee: response.data.feeUSD,
-        netAmount: response.data.goldGrams
-      });
+      setBuyCalculation(response.data);
     } catch (error) {
-      console.error('Calculation error:', error);
+      console.error('Calculate buy error:', error);
     }
   };
   
@@ -125,719 +116,392 @@ export default function ExchangePage() {
     }
     
     try {
-      const response = await api.get('/api/prices/exchange/gold-to-crypto', {
-        params: {
-          crypto: sellCurrency,
-          goldGrams: parseFloat(sellGoldAmount)
-        }
+      const response = await api.post('/api/gold-exchange/calculate-sell', {
+        goldGrams: parseFloat(sellGoldAmount),
+        targetCurrency: sellCurrency
       });
       
-      setSellCalculation({
-        cryptoCurrency: sellCurrency,
-        goldGrams: parseFloat(sellGoldAmount),
-        goldPricePerGram: response.data.goldPricePerGram,
-        cryptoPriceUsd: response.data.cryptoPriceUSD,
-        goldValueUsd: response.data.goldValueUSD,
-        fee: response.data.feeUSD,
-        netAmount: response.data.cryptoAmount
-      });
+      setSellCalculation(response.data);
     } catch (error) {
-      console.error('Calculation error:', error);
+      console.error('Calculate sell error:', error);
     }
   };
   
   const executeBuy = async () => {
-    if (!buyCalculation || !buyAmount) return;
+    if (!buyCalculation) return;
     
-    if (!confirm(`Confirm: Buy ${buyCalculation.goldGrams?.toFixed(4)}g gold with ${buyAmount} ${buyCurrency}?`)) {
-      return;
-    }
+    setLoading(true);
+    setMessage(null);
     
     try {
-      setLoading(true);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      await api.post('/api/gold-exchange/crypto-to-gold', {
+      const response = await api.post('/api/gold-exchange/crypto-to-gold', {
         cryptoCurrency: buyCurrency,
         cryptoAmount: parseFloat(buyAmount)
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      setMessage({ type: 'success', text: `Successfully purchased ${buyCalculation.goldGrams?.toFixed(4)}g of gold!` });
+      setMessage({ type: 'success', text: 'Gold purchase successful!' });
       setBuyAmount('');
       setBuyCalculation(null);
-      loadPrices();
+      loadPrices(); // Refresh prices
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Exchange failed' });
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Purchase failed' });
     } finally {
       setLoading(false);
     }
   };
   
   const executeSell = async () => {
-    if (!sellCalculation || !sellGoldAmount) return;
+    if (!sellCalculation) return;
     
-    if (!confirm(`Confirm: Sell ${sellGoldAmount}g gold for ${sellCalculation.netAmount?.toFixed(8)} ${sellCurrency}?`)) {
-      return;
-    }
+    setLoading(true);
+    setMessage(null);
     
     try {
-      setLoading(true);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      await api.post('/api/gold-exchange/gold-to-crypto', {
-        cryptoCurrency: sellCurrency,
-        goldGrams: parseFloat(sellGoldAmount)
+      const response = await api.post('/api/gold-exchange/gold-to-crypto', {
+        goldGrams: parseFloat(sellGoldAmount),
+        targetCurrency: sellCurrency
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      setMessage({ type: 'success', text: `Successfully sold ${sellGoldAmount}g gold for ${sellCalculation.netAmount?.toFixed(8)} ${sellCurrency}!` });
+      setMessage({ type: 'success', text: 'Gold sale successful!' });
       setSellGoldAmount('');
       setSellCalculation(null);
-      loadPrices();
+      loadPrices(); // Refresh prices
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Exchange failed' });
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Sale failed' });
     } finally {
       setLoading(false);
     }
   };
-  
-  useEffect(() => {
-    if (buyAmount) {
-      const timer = setTimeout(calculateBuy, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [buyAmount, buyCurrency]);
-  
-  useEffect(() => {
-    if (sellGoldAmount) {
-      const timer = setTimeout(calculateSell, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [sellGoldAmount, sellCurrency]);
-  
-  if (!user) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-  
-  const getCurrentPrice = () => {
-    if (activeTab === 'buy') {
-      return buyCurrency === 'BTC' ? btcPrice : buyCurrency === 'ETH' ? ethPrice : usdtPrice;
-    }
-    return sellCurrency === 'BTC' ? btcPrice : sellCurrency === 'ETH' ? ethPrice : usdtPrice;
-  };
 
-  // Safely compute fees in USD when backend doesn't return them
   const getBuyFeeUsd = () => {
-    if (!buyCalculation) return 0;
-    const usdValue = (buyCalculation.cryptoAmount || 0) * (buyCalculation.cryptoPriceUsd || 0);
-    return (typeof buyCalculation.fee === 'number' && !Number.isNaN(buyCalculation.fee))
-      ? buyCalculation.fee
-      : usdValue * 0.005; // 0.5% platform fee fallback
+    return buyCalculation?.fee || 0;
   };
 
   const getSellFeeUsd = () => {
-    if (!sellCalculation) return 0;
-    const usdValue = (sellCalculation.goldValueUsd || 0);
-    return (typeof sellCalculation.fee === 'number' && !Number.isNaN(sellCalculation.fee))
-      ? sellCalculation.fee
-      : usdValue * 0.005; // 0.5% platform fee fallback
+    return sellCalculation?.fee || 0;
   };
 
-  return (
-    <div className="exchange-page">
-      {/* Unified Sidebar */}
-      <Sidebar userRole={user?.role} />
+  useEffect(() => {
+    calculateBuy();
+  }, [buyAmount, buyCurrency]);
 
-      {/* Main Content */}
-      <div className="main-content">
-        <div className="header">
-          <div className="header-left">
-            <h1>Gold Exchange</h1>
-            <p className="subtitle">Trade crypto for digital gold</p>
-          </div>
-          <div className="header-right">
-            <div className="price-display">
-              <div className="price-item">
-                <span className="price-label">Gold:</span>
-                <span className="price-value">${goldPrice.toFixed(2)}/g</span>
+  useEffect(() => {
+    calculateSell();
+  }, [sellGoldAmount, sellCurrency]);
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Top Navigation Bar */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center space-x-3">
+                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">U</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
+                  <p className="text-xs text-gray-500">Secure Gold Trading</p>
+                </div>
+              </Link>
+            </div>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                Dashboard
+              </Link>
+              <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                SKRs
+              </Link>
+              <Link href="/transactions" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                Transactions
+              </Link>
+              <Link href="/exchange" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
+                Exchange
+              </Link>
+            </div>
+
+            {/* User Info */}
+            <div className="flex items-center space-x-4">
+              <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                <span className="text-primary-600 font-medium text-sm">
+                  {user?.fullName?.charAt(0) || 'U'}
+                </span>
               </div>
-              <div className="price-item">
-                <span className="price-label">BTC:</span>
-                <span className="price-value">${btcPrice.toLocaleString()}</span>
-        </div>
-              <div className="price-item">
-                <span className="price-label">ETH:</span>
-                <span className="price-value">${ethPrice.toLocaleString()}</span>
-      </div>
+              <div className="hidden sm:block text-left">
+                <div className="text-sm font-medium text-gray-900">{user?.fullName}</div>
+                <div className="text-xs text-gray-500">{user?.role}</div>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Mobile Navigation */}
+        <div className="md:hidden border-t border-gray-200 bg-gray-50">
+          <div className="px-4 py-2 space-y-1">
+            <Link href="/" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              Dashboard
+            </Link>
+            <Link href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              SKRs
+            </Link>
+            <Link href="/transactions" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              Transactions
+            </Link>
+            <Link href="/exchange" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
+              Exchange
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900">Gold Exchange</h2>
+          <p className="mt-2 text-gray-600">Trade cryptocurrency for gold and vice versa</p>
+        </div>
+
+        {/* Price Display */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Gold Price</p>
+                <p className="text-2xl font-bold text-yellow-600">{formatCurrency(goldPrice)}/g</p>
+              </div>
+              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600 text-xl">🥇</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Bitcoin</p>
+                <p className="text-2xl font-bold text-orange-600">{formatCurrency(btcPrice)}</p>
+              </div>
+              <div className="h-12 w-12 bg-orange-50 rounded-lg flex items-center justify-center">
+                <span className="text-orange-600 font-bold">₿</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Ethereum</p>
+                <p className="text-2xl font-bold text-blue-600">{formatCurrency(ethPrice)}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 font-bold">Ξ</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">USDT</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(usdtPrice)}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 font-bold">₮</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Message Display */}
         {message && (
-          <div className={`alert alert-${message.type}`}>
+          <div className={`mb-6 rounded-lg p-4 ${
+            message.type === 'success' 
+              ? 'bg-green-50 text-green-700 border border-green-200' 
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
             {message.text}
-            <button className="alert-close" onClick={() => setMessage(null)}>×</button>
           </div>
         )}
 
-        <div className="content">
-          {/* Tabs */}
-          <div className="tabs">
-            <button
-              className={`tab ${activeTab === 'buy' ? 'active' : ''}`}
-              onClick={() => setActiveTab('buy')}
-            >
-              🛒 Buy Gold
-            </button>
-            <button
-              className={`tab ${activeTab === 'sell' ? 'active' : ''}`}
-              onClick={() => setActiveTab('sell')}
-            >
-              💰 Sell Gold
-            </button>
-          </div>
-
-          {/* Buy Gold Form */}
-          {activeTab === 'buy' && (
-            <div className="exchange-form">
-              <div className="form-card">
-                <h2>Buy Digital Gold</h2>
-                <p className="form-subtitle">Exchange crypto for gold credits</p>
-
-                <div className="form-group">
-                  <label>Pay With</label>
-                  <div className="currency-selector">
-                    <button
-                      className={`currency-btn ${buyCurrency === 'BTC' ? 'active' : ''}`}
-                      onClick={() => setBuyCurrency('BTC')}
-                    >
-                      ₿ BTC
-                    </button>
-                    <button
-                      className={`currency-btn ${buyCurrency === 'ETH' ? 'active' : ''}`}
-                      onClick={() => setBuyCurrency('ETH')}
-                    >
-                      Ξ ETH
-                    </button>
-                    <button
-                      className={`currency-btn ${buyCurrency === 'USDT' ? 'active' : ''}`}
-                      onClick={() => setBuyCurrency('USDT')}
-                    >
-                      ₮ USDT
-                    </button>
+        {/* Trading Interface */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Buy Gold Section */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
               </div>
+              <h3 className="text-lg font-semibold text-gray-900">Buy Gold</h3>
             </div>
 
-                <div className="form-group">
-                  <label>Amount ({buyCurrency})</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="form-input"
-                    value={buyAmount}
-                    onChange={(e) => setBuyAmount(e.target.value)}
-                    placeholder={`Enter ${buyCurrency} amount`}
-                  />
-                  <div className="form-hint">
-                    Current {buyCurrency} price: ${getCurrentPrice().toLocaleString()}
+            <div className="space-y-4">
+              {/* Currency Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pay with</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['BTC', 'ETH', 'USDT'].map((currency) => (
+                    <button
+                      key={currency}
+                      onClick={() => setBuyCurrency(currency)}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        buyCurrency === currency
+                          ? 'bg-primary-100 text-primary-700 border-2 border-primary-500'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {currency}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amount ({buyCurrency})</label>
+                <input
+                  type="number"
+                  step="0.00000001"
+                  value={buyAmount}
+                  onChange={(e) => setBuyAmount(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="0.00000000"
+                />
+              </div>
+
+              {/* Calculation Preview */}
+              {buyCalculation && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">You pay:</span>
+                    <span className="font-medium">{formatCrypto(buyCalculation.cryptoAmount || 0, buyCurrency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Gold received:</span>
+                    <span className="font-medium">{formatNumber(buyCalculation.goldGrams || 0, 4)} g</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Fee:</span>
+                    <span className="font-medium">{formatCurrency(getBuyFeeUsd())}</span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-medium">
+                    <span>Total value:</span>
+                    <span>{formatCurrency(buyCalculation.goldValueUsd || 0)}</span>
                   </div>
                 </div>
+              )}
 
-                {buyCalculation && (
-                  <div className="calculation-box">
-                    <h3>Exchange Summary</h3>
-                    <div className="calc-row">
-                      <span>You Pay:</span>
-                      <span className="calc-value">{buyCalculation.cryptoAmount} {buyCurrency}</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>≈ USD Value:</span>
-                      <span className="calc-value">${(buyCalculation.cryptoAmount! * buyCalculation.cryptoPriceUsd!).toFixed(2)}</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>Gold Price:</span>
-                      <span className="calc-value">${buyCalculation.goldPricePerGram.toFixed(2)}/g</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>Platform Fee (0.5%):</span>
-                      <span className="calc-value">${getBuyFeeUsd().toFixed(2)}</span>
-                    </div>
-                    <div className="calc-row highlight">
-                      <span>You Receive:</span>
-                      <span className="calc-value">{(buyCalculation.netAmount ?? 0).toFixed(4)} grams gold</span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  className="btn-execute"
-                  onClick={executeBuy}
-                  disabled={loading || !buyCalculation || !buyAmount}
-                >
-                  {loading ? 'Processing...' : `Buy ${buyCalculation?.netAmount?.toFixed(4) || '0'} g Gold`}
-                </button>
-              </div>
+              {/* Buy Button */}
+              <button
+                onClick={executeBuy}
+                disabled={!buyCalculation || loading}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {loading ? 'Processing...' : 'Buy Gold'}
+              </button>
             </div>
-          )}
-
-          {/* Sell Gold Form */}
-          {activeTab === 'sell' && (
-            <div className="exchange-form">
-              <div className="form-card">
-                <h2>Sell Digital Gold</h2>
-                <p className="form-subtitle">Exchange gold credits for crypto</p>
-
-                <div className="form-group">
-                  <label>Receive</label>
-                  <div className="currency-selector">
-                    <button
-                      className={`currency-btn ${sellCurrency === 'BTC' ? 'active' : ''}`}
-                      onClick={() => setSellCurrency('BTC')}
-                    >
-                      ₿ BTC
-                    </button>
-                    <button
-                      className={`currency-btn ${sellCurrency === 'ETH' ? 'active' : ''}`}
-                      onClick={() => setSellCurrency('ETH')}
-                    >
-                      Ξ ETH
-                    </button>
-                    <button
-                      className={`currency-btn ${sellCurrency === 'USDT' ? 'active' : ''}`}
-                      onClick={() => setSellCurrency('USDT')}
-                    >
-                      ₮ USDT
-            </button>
           </div>
+
+          {/* Sell Gold Section */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="h-8 w-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <svg className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Sell Gold</h3>
             </div>
 
-                <div className="form-group">
-                  <label>Gold Amount (grams)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="form-input"
-                    value={sellGoldAmount}
-                    onChange={(e) => setSellGoldAmount(e.target.value)}
-                    placeholder="Enter gold amount in grams"
-                  />
-                  <div className="form-hint">
-                    Current gold price: ${goldPrice.toFixed(2)}/gram
+            <div className="space-y-4">
+              {/* Gold Amount Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gold Amount (grams)</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={sellGoldAmount}
+                  onChange={(e) => setSellGoldAmount(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="0.0000"
+                />
+              </div>
+
+              {/* Currency Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Receive in</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['BTC', 'ETH', 'USDT'].map((currency) => (
+                    <button
+                      key={currency}
+                      onClick={() => setSellCurrency(currency)}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        sellCurrency === currency
+                          ? 'bg-primary-100 text-primary-700 border-2 border-primary-500'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {currency}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculation Preview */}
+              {sellCalculation && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">You sell:</span>
+                    <span className="font-medium">{formatNumber(sellCalculation.goldGrams || 0, 4)} g</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">You receive:</span>
+                    <span className="font-medium">{formatCrypto(sellCalculation.netAmount || 0, sellCurrency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Fee:</span>
+                    <span className="font-medium">{formatCurrency(getSellFeeUsd())}</span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-medium">
+                    <span>Total value:</span>
+                    <span>{formatCurrency(sellCalculation.goldValueUsd || 0)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Sell Button */}
+              <button
+                onClick={executeSell}
+                disabled={!sellCalculation || loading}
+                className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+              >
+                {loading ? 'Processing...' : 'Sell Gold'}
+              </button>
+            </div>
           </div>
         </div>
 
-                {sellCalculation && (
-                  <div className="calculation-box">
-                    <h3>Exchange Summary</h3>
-                    <div className="calc-row">
-                      <span>You Sell:</span>
-                      <span className="calc-value">{sellCalculation.goldGrams} grams gold</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>≈ USD Value:</span>
-                      <span className="calc-value">${sellCalculation.goldValueUsd?.toFixed(2)}</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>{sellCurrency} Price:</span>
-                      <span className="calc-value">${sellCalculation.cryptoPriceUsd?.toLocaleString()}</span>
-                    </div>
-                    <div className="calc-row">
-                      <span>Platform Fee (0.5%):</span>
-                      <span className="calc-value">${getSellFeeUsd().toFixed(2)}</span>
-                    </div>
-                    <div className="calc-row highlight">
-                      <span>You Receive:</span>
-                      <span className="calc-value">{(sellCalculation.netAmount ?? 0).toFixed(8)} {sellCurrency}</span>
-            </div>
-          </div>
-                )}
-
-                <button
-                  className="btn-execute"
-                  onClick={executeSell}
-                  disabled={loading || !sellCalculation || !sellGoldAmount}
-                >
-                  {loading ? 'Processing...' : `Sell for ${sellCalculation?.netAmount?.toFixed(8) || '0'} ${sellCurrency}`}
-                </button>
-              </div>
-          </div>
-          )}
+        {/* Back to Dashboard */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-primary-600 hover:text-primary-700 font-medium"
+          >
+            ← Back to Dashboard
+          </button>
         </div>
       </div>
-
-      <style jsx>{`
-        .exchange-page {
-          display: flex;
-          min-height: 100vh;
-          background: #1A1A1A;
-          color: white;
-        }
-
-        .sidebar {
-          width: 250px;
-          background: #2C2C2C;
-          padding: 2rem 0;
-          border-right: 1px solid #444;
-        }
-
-        .sidebar-header {
-          padding: 0 2rem 2rem;
-          border-bottom: 1px solid #444;
-        }
-
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .logo-icon {
-          width: 40px;
-          height: 40px;
-          background: linear-gradient(45deg, #FFD700, #B8860B);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 1.2rem;
-        }
-
-        .logo-text {
-          font-size: 1.1rem;
-          font-weight: bold;
-          color: #FFD700;
-        }
-
-        .sidebar-nav {
-          padding: 2rem 0;
-        }
-
-        .main-content {
-          flex: 1;
-          margin-left: 250px;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .header {
-          background: #2C2C2C;
-          padding: 2rem;
-          border-bottom: 1px solid #444;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .header h1 {
-          margin: 0;
-          font-size: 1.8rem;
-          color: #FFD700;
-        }
-
-        .subtitle {
-          margin: 0.5rem 0 0;
-          color: #999;
-        }
-
-        .price-display {
-          display: flex;
-          gap: 2rem;
-        }
-
-        .price-item {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-        }
-
-        .price-label {
-          font-size: 0.85rem;
-          color: #999;
-        }
-
-        .price-value {
-          font-weight: 700;
-          color: #FFD700;
-          font-size: 1.1rem;
-        }
-
-        .alert {
-          margin: 2rem;
-          padding: 1rem 1.5rem;
-          border-radius: 8px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .alert-success {
-          background: rgba(0, 200, 83, 0.2);
-          border: 1px solid #00C853;
-          color: #00C853;
-        }
-
-        .alert-error {
-          background: rgba(220, 53, 69, 0.2);
-          border: 1px solid #dc3545;
-          color: #dc3545;
-        }
-
-        .alert-close {
-          background: none;
-          border: none;
-          color: inherit;
-          font-size: 1.5rem;
-          cursor: pointer;
-        }
-
-        .content {
-          flex: 1;
-          padding: 2rem;
-        }
-
-        .tabs {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        .tab {
-          flex: 1;
-          padding: 1rem;
-          background: #2C2C2C;
-          border: 2px solid #444;
-          border-radius: 12px;
-          color: white;
-          font-size: 1.1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .tab:hover {
-          border-color: #FFD700;
-        }
-
-        .tab.active {
-          background: linear-gradient(135deg, #FFD700, #B8860B);
-          color: #000;
-          border-color: #FFD700;
-        }
-
-        .exchange-form {
-          display: flex;
-          justify-content: center;
-        }
-
-        .form-card {
-          background: #2C2C2C;
-          border: 1px solid #444;
-          border-radius: 16px;
-          padding: 2.5rem;
-          width: 100%;
-          max-width: 600px;
-        }
-
-        .form-card h2 {
-          margin: 0 0 0.5rem;
-          color: #FFD700;
-        }
-
-        .form-subtitle {
-          color: #999;
-          margin: 0 0 2rem;
-        }
-
-        .form-group {
-          margin-bottom: 2rem;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 1rem;
-          font-weight: 600;
-          color: #FFD700;
-        }
-
-        .currency-selector {
-          display: flex;
-          gap: 1rem;
-        }
-
-        .currency-btn {
-          flex: 1;
-          padding: 1rem;
-          background: #1A1A1A;
-          border: 2px solid #444;
-          border-radius: 8px;
-          color: white;
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .currency-btn:hover {
-          border-color: #FFD700;
-        }
-
-        .currency-btn.active {
-          background: #FFD700;
-          color: #000;
-          border-color: #FFD700;
-        }
-
-        .form-input {
-          width: 100%;
-          padding: 1rem;
-          background: #1A1A1A;
-          border: 2px solid #444;
-          border-radius: 8px;
-          color: white;
-          font-size: 1.1rem;
-        }
-
-        .form-input:focus {
-          outline: none;
-          border-color: #FFD700;
-        }
-
-        .form-hint {
-          margin-top: 0.5rem;
-          font-size: 0.9rem;
-          color: #999;
-        }
-
-        .calculation-box {
-          background: #1A1A1A;
-          border: 1px solid #FFD700;
-          border-radius: 12px;
-          padding: 1.5rem;
-          margin: 2rem 0;
-        }
-
-        .calculation-box h3 {
-          margin: 0 0 1rem;
-          color: #FFD700;
-          font-size: 1.1rem;
-        }
-
-        .calc-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.75rem 0;
-          border-bottom: 1px solid #333;
-        }
-
-        .calc-row:last-child {
-          border-bottom: none;
-        }
-
-        .calc-row.highlight {
-          background: rgba(255, 215, 0, 0.1);
-          padding: 0.75rem;
-          border-radius: 8px;
-          margin-top: 0.5rem;
-        }
-
-        .calc-row.highlight span {
-          font-weight: 700;
-          font-size: 1.1rem;
-        }
-
-        .calc-value {
-          color: #00C853;
-          font-weight: 600;
-        }
-
-        .btn-execute {
-          width: 100%;
-          padding: 1.25rem;
-          background: linear-gradient(135deg, #00C853, #00A844);
-          border: none;
-          border-radius: 12px;
-          color: white;
-          font-size: 1.2rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .btn-execute:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(0, 200, 83, 0.4);
-        }
-
-        .btn-execute:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .loading-screen {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          background: #1A1A1A;
-          color: white;
-        }
-
-        .spinner {
-          width: 50px;
-          height: 50px;
-          border: 4px solid #444;
-          border-top-color: #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 768px) {
-          .exchange-page {
-            flex-direction: column;
-          }
-
-          .sidebar {
-            width: 100%;
-          }
-
-          .main-content {
-            margin-left: 0;
-          }
-
-          .header {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: flex-start;
-          }
-
-          .price-display {
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          .form-card {
-            padding: 1.5rem;
-          }
-
-          .tabs {
-            flex-direction: column;
-          }
-        }
-      `}</style>
     </div>
   );
 }

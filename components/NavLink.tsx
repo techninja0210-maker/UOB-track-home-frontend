@@ -31,46 +31,23 @@ export default function NavLink({ href, children, className = '' }: NavLinkProps
   return (
     <Link 
       href={href} 
-      className={`nav-item ${isActive ? 'active' : ''} ${className} ${isNavigating ? 'navigating' : ''}`}
+      className={`
+        flex items-center space-x-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200
+        ${isActive 
+          ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-600' 
+          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+        }
+        ${isNavigating ? 'opacity-70' : ''}
+        ${className}
+      `}
       onClick={handleClick}
     >
       {children}
       {isNavigating && (
-        <div className="nav-loading">
-          <div className="nav-spinner"></div>
+        <div className="ml-auto">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-primary-600"></div>
         </div>
       )}
-      
-      <style jsx>{`
-        .nav-item {
-          position: relative;
-        }
-
-        .nav-item.navigating {
-          opacity: 0.7;
-        }
-
-        .nav-loading {
-          position: absolute;
-          right: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-        }
-
-        .nav-spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid #333;
-          border-top: 2px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </Link>
   );
 }

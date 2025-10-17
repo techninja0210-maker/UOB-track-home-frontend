@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
+import { formatCurrency, formatNumber, formatCrypto, formatCompact } from '@/lib/formatters';
 
 interface User {
   id: number;
