@@ -1,145 +1,332 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
+import Image from 'next/image';
+import notificationSocket from '@/lib/notificationSocket';
+import NotificationCenter from '@/components/NotificationCenter';
+
+interface PoolWallet {
+  currency: string;
+  address: string;
+  balance: number;
+  pending: number;
+}
+
+interface WithdrawalRequest {
+  id: string;
+  userId: string;
+  currency: string;
+  amount: number;
+  toAddress: string;
+  status: string;
+  createdAt: string;
+}
 
 export default function AdminPoolWallets() {
-  const [btc, setBtc] = useState('');
-  const [eth, setEth] = useState('');
-  const [usdt, setUsdt] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [poolWallets, setPoolWallets] = useState<PoolWallet[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState('BTC');
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalAddress, setWithdrawalAddress] = useState('');
 
   useEffect(() => {
-    // Optional: fetch current pool addresses from public endpoint
-    (async () => {
-      try {
-        const [btcRes, ethRes, usdtRes] = await Promise.all([
-          api.get('/api/wallet/pool-address/BTC'),
-          api.get('/api/wallet/pool-address/ETH'),
-          api.get('/api/wallet/pool-address/USDT'),
-        ]);
-        setBtc(btcRes.data?.address || '');
-        setEth(ethRes.data?.address || '');
-        setUsdt(usdtRes.data?.address || '');
-      } catch {}
-    })();
+    loadPoolData();
   }, []);
 
-  const isEthLike = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
-  const isBtcLike = (addr: string) => /^([13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[0-9a-zA-Z]{11,71})$/.test(addr.trim());
-
-  const saveAddress = async (currency: 'BTC' | 'ETH' | 'USDT', address: string) => {
+  const loadPoolData = async () => {
     try {
-      setSaving(true);
-      setMessage(null);
-      if (currency === 'BTC' && !isBtcLike(address)) throw new Error('Invalid BTC address');
-      if ((currency === 'ETH' || currency === 'USDT') && !isEthLike(address)) throw new Error('Invalid EVM address');
-
-      await api.post('/api/admin/pool-address', { currency, address });
-      setMessage({ type: 'success', text: `${currency} pool address saved` });
-    } catch (e: any) {
-      setMessage({ type: 'error', text: e?.response?.data?.message || e?.message || 'Failed to save' });
+      setLoading(true);
+      const [walletsRes, requestsRes] = await Promise.all([
+        api.get('/api/admin/pool-wallets'),
+        api.get('/api/admin/withdrawal-requests'),
+      ]);
+      setPoolWallets(walletsRes.data || []);
+      setWithdrawalRequests(requestsRes.data || []);
+    } catch (error) {
+      console.error('Error loading pool data:', error);
+      notificationSocket.notifyLocal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load pool wallet data.',
+      });
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  return (
-    <AdminLayout>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Pool Wallets</h1>
-          <p className="mt-2 text-gray-600">Set the BTC and EVM (ETH/USDT) pool addresses used for deposits</p>
+  const handleWithdrawal = async () => {
+    if (!withdrawalAmount || !withdrawalAddress) {
+      notificationSocket.notifyLocal({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fill in all fields.',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      await api.post('/api/admin/pool-withdrawal', {
+        currency: selectedCurrency,
+        amount: parseFloat(withdrawalAmount),
+        toAddress: withdrawalAddress,
+      });
+      
+      notificationSocket.notifyLocal({
+        type: 'success',
+        title: 'Success',
+        message: `${selectedCurrency} withdrawal initiated.`,
+      });
+      
+      setWithdrawalAmount('');
+      setWithdrawalAddress('');
+      loadPoolData(); // Reload balances
+    } catch (error) {
+      console.error('Error processing withdrawal:', error);
+      notificationSocket.notifyLocal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to process withdrawal.',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleApproveWithdrawal = async (requestId: string) => {
+    setProcessing(true);
+    try {
+      await api.post(`/api/admin/approve-withdrawal/${requestId}`);
+      
+      notificationSocket.notifyLocal({
+        type: 'success',
+        title: 'Success',
+        message: 'Withdrawal request approved.',
+      });
+      
+      loadPoolData(); // Reload data
+    } catch (error) {
+      console.error('Error approving withdrawal:', error);
+      notificationSocket.notifyLocal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to approve withdrawal.',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const getQrCodeUrl = (address: string, currency: string) => {
+    if (!address) return '';
+    const data = currency === 'BTC' ? `bitcoin:${address}` : `ethereum:${address}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${data}`;
+  };
+
+  const formatBalance = (balance: number) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    }).format(balance);
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout title="Pool Wallets" subtitle="Manage platform pool wallets">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600"></div>
         </div>
+      </AdminLayout>
+    );
+  }
 
-        {message && (
-          <div className={`mb-6 rounded-lg p-4 ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-            {message.text}
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">BTC Pool Address</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">BTC Address</label>
-                <input
-                  value={btc}
-                  onChange={e => setBtc(e.target.value)}
-                  placeholder="bc1... or 1..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-                <div className="mt-3">
-                  <button
-                    disabled={saving}
-                    onClick={() => saveAddress('BTC', btc)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-300"
-                  >
-                    {saving ? 'Saving...' : 'Save BTC Address'}
-                  </button>
-                </div>
+  return (
+    <AdminLayout title="Pool Wallets" subtitle="Manage platform pool wallets">
+      <NotificationCenter userId="admin" />
+      <div className="space-y-8">
+        {/* Pool Wallet Balances */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {poolWallets.map((wallet) => (
+            <div key={wallet.currency} className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {wallet.currency} Pool Wallet
+                </h3>
+                <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                  Active
+                </span>
               </div>
-              <div className="flex justify-center">
-                {btc && (
-                  <img
-                    alt="BTC QR"
-                    className="h-32 w-32 rounded bg-white border"
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=bitcoin:${encodeURIComponent(btc)}`}
-                  />
+              
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-600">Address:</p>
+                  <p className="font-mono text-sm bg-gray-50 p-2 rounded break-all">
+                    {wallet.address}
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Balance:</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatBalance(wallet.balance)} {wallet.currency}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Pending:</p>
+                    <p className="text-lg font-semibold text-orange-600">
+                      {formatBalance(wallet.pending)} {wallet.currency}
+                    </p>
+                  </div>
+                </div>
+
+                {wallet.address && (
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-2">QR Code:</p>
+                    <Image
+                      src={getQrCodeUrl(wallet.address, wallet.currency)}
+                      alt={`${wallet.currency} QR Code`}
+                      width={120}
+                      height={120}
+                      className="mx-auto border border-gray-200 rounded-lg"
+                    />
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          ))}
+        </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">ETH / USDT Pool Address (EVM)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ETH Pool Address</label>
-                <input
-                  value={eth}
-                  onChange={e => setEth(e.target.value)}
-                  placeholder="0x..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-                <div className="mt-3">
-                  <button
-                    disabled={saving}
-                    onClick={() => saveAddress('ETH', eth)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-300"
-                  >
-                    {saving ? 'Saving...' : 'Save ETH Address'}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">USDT Pool Address</label>
-                <input
-                  value={usdt}
-                  onChange={e => setUsdt(e.target.value)}
-                  placeholder="0x... (same as ETH recommended)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-                <div className="mt-3">
-                  <button
-                    disabled={saving}
-                    onClick={() => saveAddress('USDT', usdt)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-300"
-                  >
-                    {saving ? 'Saving...' : 'Save USDT Address'}
-                  </button>
-                </div>
-              </div>
+        {/* Admin Withdrawal */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">Admin Withdrawal</h3>
+          <p className="text-gray-600 mb-4">
+            Send crypto from pool wallet to external addresses.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Currency
+              </label>
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="BTC">BTC</option>
+                <option value="ETH">ETH</option>
+                <option value="USDT">USDT</option>
+              </select>
             </div>
-            <p className="text-xs text-gray-500 mt-3">Tip: For EVM networks, USDT can share the same address as ETH.</p>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Amount
+              </label>
+              <input
+                type="number"
+                step="0.000001"
+                value={withdrawalAmount}
+                onChange={(e) => setWithdrawalAmount(e.target.value)}
+                placeholder="0.000000"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                To Address
+              </label>
+              <input
+                type="text"
+                value={withdrawalAddress}
+                onChange={(e) => setWithdrawalAddress(e.target.value)}
+                placeholder="Enter destination address"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                onClick={handleWithdrawal}
+                disabled={processing}
+                className="w-full bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 disabled:bg-gray-300"
+              >
+                {processing ? 'Processing...' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Pending Withdrawal Requests */}
+        {withdrawalRequests.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Pending Withdrawal Requests</h3>
+            
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Currency
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      To Address
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {withdrawalRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {request.userId}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {request.currency}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatBalance(request.amount)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 font-mono">
+                        {request.toAddress}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(request.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={() => handleApproveWithdrawal(request.id)}
+                          disabled={processing}
+                          className="text-primary-600 hover:text-primary-900 disabled:text-gray-400"
+                        >
+                          Approve
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
 }
-
-

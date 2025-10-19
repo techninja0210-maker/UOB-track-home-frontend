@@ -91,6 +91,18 @@ export default function Dashboard() {
   const [depositSuccess, setDepositSuccess] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [mmTokenBalance, setMmTokenBalance] = useState<string>(''); // e.g., USDT balance
+  // User's platform balances (off-chain credits)
+  const [userBalances, setUserBalances] = useState<{[key: string]: number}>({
+    BTC: 0,
+    ETH: 0,
+    USDT: 0
+  });
+  // Current crypto prices
+  const [cryptoPrices, setCryptoPrices] = useState<{[key: string]: number}>({
+    BTC: 50000,
+    ETH: 2000,
+    USDT: 1
+  });
   // Fixed top-right toast (3s)
   const [topToast, setTopToast] = useState<{ text: string; type: 'warning' | 'error' | 'success' } | null>(null);
   const showTopToast = (text: string, type: 'warning' | 'error' | 'success' = 'warning') => {
@@ -127,6 +139,21 @@ export default function Dashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Load pool address when currency changes or MetaMask connects
+  useEffect(() => {
+    if (mmConnected) {
+      getPoolAddress();
+    }
+  }, [depositCurrency, mmConnected]);
+
+  // Load user balances and crypto prices when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      loadUserBalances();
+      getCryptoPrices().then(prices => setCryptoPrices(prices));
+    }
+  }, [user?.id]);
+
   const checkAuthentication = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
@@ -151,11 +178,18 @@ export default function Dashboard() {
       setLoading(true);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
 
-      // Load wallet balances
+      // Load wallet balances (legacy - keeping for compatibility)
       const walletResponse = await api.get('/api/wallet/balances', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setWalletBalances(walletResponse.data.balances || []);
+
+      // Load user platform balances
+      await loadUserBalances();
+      
+      // Load crypto prices
+      const prices = await getCryptoPrices();
+      setCryptoPrices(prices);
 
       // Load gold holdings
       const goldResponse = await api.get('/api/gold-holdings', {
@@ -340,6 +374,25 @@ export default function Dashboard() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: networkConfig.chainId }],
       });
+      
+      // Network switched successfully, refresh pool address and balance
+      setPoolAddress(''); // Clear old address
+      await getPoolAddress(); // Get fresh address for current currency
+      
+      // Refresh balance for current currency
+      if (mmAddress) {
+        if (depositCurrency === 'ETH') {
+          const balance = await (window as any).ethereum.request({
+            method: 'eth_getBalance',
+            params: [mmAddress, 'latest']
+          });
+          const balanceInEth = parseInt(balance, 16) / Math.pow(10, 18);
+          setMmBalance(balanceInEth.toFixed(4));
+        } else if (depositCurrency === 'USDT') {
+          await loadUsdtBalance(mmAddress);
+        }
+      }
+      
     } catch (error: any) {
       if (error.code === 4902) {
         // Network not added, add it
@@ -359,6 +412,11 @@ export default function Dashboard() {
               },
             }],
           });
+          
+          // After adding network, refresh pool address
+          setPoolAddress('');
+          await getPoolAddress();
+          
         } catch (addError) {
           console.error('Failed to add network:', addError);
         }
@@ -398,12 +456,54 @@ export default function Dashboard() {
 
   const getPoolAddress = async () => {
     try {
+      setPoolAddress(''); // Clear previous address
       const response = await api.get(`/api/wallet/pool-address/${depositCurrency}`);
-      setPoolAddress(response.data.address);
+      if (response.data && response.data.address) {
+        setPoolAddress(response.data.address);
+        setDepositError(''); // Clear any previous errors
+      } else {
+        setDepositError(`No pool address found for ${depositCurrency}`);
+      }
     } catch (error) {
       console.error('Failed to get pool address:', error);
-      setDepositError('Failed to get pool address');
+      setDepositError(`Failed to get ${depositCurrency} pool address`);
+      setPoolAddress('');
     }
+  };
+
+  const loadUserBalances = async () => {
+    try {
+      const response = await api.get('/api/wallet/balances');
+      if (response.data && Array.isArray(response.data)) {
+        const balances: {[key: string]: number} = { BTC: 0, ETH: 0, USDT: 0 };
+        response.data.forEach((balance: any) => {
+          if (balance.currency && balance.balance !== undefined) {
+            balances[balance.currency] = parseFloat(balance.balance) || 0;
+          }
+        });
+        setUserBalances(balances);
+      }
+    } catch (error) {
+      console.error('Failed to load user balances:', error);
+      // Keep default zero balances on error
+    }
+  };
+
+  const getCryptoPrices = async () => {
+    try {
+      const response = await api.get('/api/prices');
+      if (response.data) {
+        return {
+          BTC: response.data.BTC || 50000,
+          ETH: response.data.ETH || 2000,
+          USDT: response.data.USDT || 1
+        };
+      }
+    } catch (error) {
+      console.error('Failed to get crypto prices:', error);
+    }
+    // Fallback prices
+    return { BTC: 50000, ETH: 2000, USDT: 1 };
   };
 
   const sendDeposit = async () => {
@@ -449,6 +549,23 @@ export default function Dashboard() {
         setDepositSuccess(`Send BTC to: ${poolAddress}`);
       }
 
+      // Refresh platform balances after successful deposit
+      await loadUserBalances();
+      
+      // Refresh MetaMask balance
+      if (mmAddress) {
+        if (depositCurrency === 'ETH') {
+          const balance = await (window as any).ethereum.request({
+            method: 'eth_getBalance',
+            params: [mmAddress, 'latest']
+          });
+          const balanceInEth = parseInt(balance, 16) / Math.pow(10, 18);
+          setMmBalance(balanceInEth.toFixed(4));
+        } else if (depositCurrency === 'USDT') {
+          await loadUsdtBalance(mmAddress);
+        }
+      }
+
       setDepositAmount('');
     } catch (error: any) {
       console.error('Send deposit error:', error);
@@ -456,12 +573,12 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate totals
-  const totalCryptoValue = walletBalances.reduce((sum, balance) => sum + balance.valueUsd, 0);
+  // Calculate totals using platform balances and real-time prices
+  const totalCryptoValue = (userBalances.ETH * cryptoPrices.ETH) + (userBalances.USDT * cryptoPrices.USDT) + (userBalances.BTC * cryptoPrices.BTC);
   const totalGoldValue = goldHoldings.reduce((sum, holding) => sum + (holding.currentValue || 0), 0);
   const totalPortfolioValue = totalCryptoValue + totalGoldValue;
   const totalSKRProfitLoss = skrReceipts.reduce((sum, skr) => sum + (skr.profitLoss || 0), 0);
-  const hasCryptoData = walletBalances && walletBalances.length > 0;
+  const hasCryptoData = userBalances.ETH > 0 || userBalances.USDT > 0 || userBalances.BTC > 0;
   const hasGoldData = goldHoldings && goldHoldings.length > 0;
   const hasSkrData = skrReceipts && skrReceipts.length > 0;
 
@@ -685,19 +802,69 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Network Status */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">Network</span>
-                    <span className="text-sm text-gray-600">{mmNetwork}</span>
+                  {/* Connection Status */}
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        <span className="text-sm font-medium text-green-800">MetaMask Connected</span>
+                      </div>
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                        {mmNetwork}
+                      </span>
+                    </div>
+                    <div className="text-xs text-green-700 font-mono break-all">
+                      {mmAddress}
+                    </div>
                   </div>
 
-                  {/* Wallet Balance */}
+                  {/* Pool Address - Prominently Displayed */}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-blue-900">Pool Deposit Address</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">{depositCurrency}</span>
+                        <span className="text-xs text-blue-500 bg-blue-100 px-2 py-1 rounded">{mmNetwork}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs text-blue-800 bg-white p-2 rounded border font-mono break-all">
+                        {poolAddress ? poolAddress : 'Loading pool address...'}
+                      </code>
+                      <button
+                        onClick={async () => {
+                          if (!poolAddress) return;
+                          try {
+                            await navigator.clipboard.writeText(poolAddress);
+                            notificationSocket.notifyLocal({
+                              type: 'success',
+                              title: 'Copied',
+                              message: `${depositCurrency} pool address copied`,
+                            });
+                          } catch {}
+                        }}
+                        disabled={!poolAddress}
+                        className="px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 rounded transition-colors"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      Send {depositCurrency} to this address to deposit to the platform
+                      {depositCurrency === 'BTC' && ' (use external wallet)'}
+                      {depositCurrency === 'ETH' && ' (via MetaMask)'}
+                      {depositCurrency === 'USDT' && ' (via MetaMask)'}
+                    </p>
+                  </div>
+
+
+                  {/* MetaMask Wallet Balance */}
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">Balance</span>
+                    <span className="text-sm font-medium text-gray-700">Your MetaMask Balance</span>
                     <span className="text-sm text-gray-600">
                       {depositCurrency === 'ETH' && formatCrypto(parseFloat(mmBalance || '0'), 'ETH')}
                       {depositCurrency === 'USDT' && (mmTokenBalance ? `${mmTokenBalance} USDT` : '—')}
-                      {depositCurrency === 'BTC' && 'Use external wallet (see BTC address)'}
+                      {depositCurrency === 'BTC' && 'Use external wallet'}
                     </span>
                   </div>
 
@@ -735,7 +902,8 @@ export default function Dashboard() {
                           onChange={async (e) => {
                             const cur = e.target.value as 'BTC' | 'ETH' | 'USDT';
                             setDepositCurrency(cur);
-                            await getPoolAddress();
+                            setPoolAddress(''); // Clear old address
+                            await getPoolAddress(); // Get new address
                             if (cur === 'USDT' && mmAddress) {
                               await loadUsdtBalance(mmAddress);
                             }
@@ -764,33 +932,53 @@ export default function Dashboard() {
                       disabled={!depositAmount}
                       className="w-full bg-success-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-success-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
                     >
-                      {depositCurrency === 'BTC' ? 'Show BTC Deposit Address' : 'Deposit to Pool'}
+                      {depositCurrency === 'BTC' ? 'Show BTC Deposit Instructions' : `Send ${depositCurrency} to Pool`}
                     </button>
                   </div>
 
-                  {/* BTC Deposit Details: Address + QR */}
+                  {/* BTC Deposit Instructions */}
                   {depositCurrency === 'BTC' && poolAddress && (
-                    <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
+                      <div className="flex items-center mb-3">
+                        <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center mr-2">
+                          <span className="text-white text-xs font-bold">₿</span>
+                        </div>
+                        <h4 className="text-sm font-semibold text-orange-900">Bitcoin Deposit Instructions</h4>
+                      </div>
                       <div className="flex items-start gap-4">
-                        <div>
+                        <div className="text-center">
                           <img
                             alt="BTC Deposit QR"
-                            className="h-32 w-32 rounded bg-white border"
+                            className="h-24 w-24 rounded bg-white border mx-auto"
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=bitcoin:${encodeURIComponent(poolAddress)}`}
                           />
+                          <p className="text-xs text-orange-600 mt-1">Scan QR Code</p>
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-700">BTC Pool Address</p>
-                          <p className="text-sm text-gray-900 break-all mt-1">{poolAddress}</p>
+                          <p className="text-xs text-orange-700 mb-2">Send BTC to this address from your external wallet:</p>
+                          <code className="block text-xs text-orange-800 bg-white p-2 rounded border font-mono break-all mb-2">
+                            {poolAddress}
+                          </code>
                           <button
-                            onClick={async () => { try { await navigator.clipboard.writeText(poolAddress); notificationSocket.notifyLocal({ type: 'success', title: 'Copied', message: 'BTC address copied' }); } catch {} }}
-                            className="mt-2 inline-flex items-center px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+                            onClick={async () => { 
+                              try { 
+                                await navigator.clipboard.writeText(poolAddress); 
+                                notificationSocket.notifyLocal({ 
+                                  type: 'success', 
+                                  title: 'Copied', 
+                                  message: 'BTC address copied to clipboard' 
+                                }); 
+                              } catch {} 
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
                           >
-                            Copy Address
+                            📋 Copy Address
                           </button>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500 mt-3">Send only BTC to this address. Sending any other asset may result in loss.</p>
+                      <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-700">
+                        <strong>Note:</strong> Bitcoin deposits are processed automatically once confirmed on the blockchain.
+                      </div>
                     </div>
                   )}
 
