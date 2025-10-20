@@ -516,33 +516,62 @@ export default function Dashboard() {
       setDepositError('');
       setDepositSuccess('');
 
+      console.log('🚀 Starting deposit process...', {
+        currency: depositCurrency,
+        amount: depositAmount,
+        poolAddress,
+        userAddress: mmAddress
+      });
+
       // Create deposit intent
-      await api.post('/api/wallet/deposit-intent', {
+      const depositIntent = await api.post('/api/wallet/deposit-intent', {
         currency: depositCurrency,
         amount: parseFloat(depositAmount),
         userAddress: mmAddress
       });
+      
+      console.log('✅ Deposit intent created:', depositIntent.data);
 
       if (depositCurrency === 'ETH') {
-        if (!mmConnected) throw new Error('Connect MetaMask first');
+        if (!mmConnected) throw new Error('Please connect MetaMask first');
+        
+        console.log('💰 Sending ETH transaction...', {
+          from: mmAddress,
+          to: poolAddress,
+          amount: depositAmount
+        });
+        
         const valueHex = '0x' + Math.floor(parseFloat(depositAmount) * 1e18).toString(16);
         const txHash = await (window as any).ethereum.request({
           method: 'eth_sendTransaction',
           params: [{ from: mmAddress, to: poolAddress, value: valueHex }]
         });
+        
+        console.log('✅ ETH transaction sent:', txHash);
         setDepositSuccess(`Transaction sent! Hash: ${txHash}`);
       } else if (depositCurrency === 'USDT') {
-        if (!mmConnected) throw new Error('Connect MetaMask first');
+        if (!mmConnected) throw new Error('Please connect MetaMask first');
+        
+        console.log('💰 Sending USDT transaction...', {
+          from: mmAddress,
+          to: poolAddress,
+          amount: depositAmount
+        });
+        
         const token = getUsdtContractAddress();
         if (!token) throw new Error('USDT not available on this network');
+        
         const methodId = '0xa9059cbb'; // transfer(address,uint256)
         const toPadded = poolAddress.replace('0x', '').padStart(64, '0');
         const amountHex = BigInt(Math.floor(parseFloat(depositAmount) * 1e6)).toString(16).padStart(64, '0');
         const data = methodId + toPadded + amountHex;
+        
         const txHash = await (window as any).ethereum.request({
           method: 'eth_sendTransaction',
           params: [{ from: mmAddress, to: token, data }]
         });
+        
+        console.log('✅ USDT transaction sent:', txHash);
         setDepositSuccess(`Transaction sent! Hash: ${txHash}`);
       } else if (depositCurrency === 'BTC') {
         // BTC handled by external wallet; just surface address
@@ -568,8 +597,28 @@ export default function Dashboard() {
 
       setDepositAmount('');
     } catch (error: any) {
-      console.error('Send deposit error:', error);
-      setDepositError(error.message || 'Transaction failed');
+      console.error('❌ Send deposit error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Transaction failed';
+      
+      if (error.code === 4001 || error.code === -4001) {
+        errorMessage = 'Transaction rejected by user';
+      } else if (error.code === -32002) {
+        errorMessage = 'Transaction already pending, please wait';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds in your wallet';
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error, please check your connection';
+      } else if (error.message?.includes('MetaMask')) {
+        errorMessage = 'MetaMask error: ' + error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setDepositError(errorMessage);
     }
   };
 
@@ -982,7 +1031,36 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Deprecated legacy messages removed in favor of inlineNotice and topToast */}
+                  {/* Error and Success Messages */}
+                  {depositError && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-red-800">{depositError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {depositSuccess && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-green-800">{depositSuccess}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
