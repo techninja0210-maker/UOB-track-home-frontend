@@ -92,39 +92,72 @@ export default function ExchangePage() {
   };
   
   const calculateBuy = async () => {
-    if (!buyAmount || parseFloat(buyAmount) <= 0) {
+    const amount = parseFloat(buyAmount || '0');
+    if (!amount || amount <= 0 || goldPrice <= 0) {
       setBuyCalculation(null);
       return;
     }
-    
-    try {
-      const response = await api.post('/api/gold-exchange/calculate', {
-        cryptoCurrency: buyCurrency,
-        cryptoAmount: parseFloat(buyAmount)
-      });
-      
-      setBuyCalculation(response.data);
-    } catch (error) {
-      console.error('Calculate buy error:', error);
+
+    // Resolve crypto price based on selected currency
+    const cryptoPriceUsd = buyCurrency === 'BTC' ? btcPrice : buyCurrency === 'ETH' ? ethPrice : usdtPrice;
+    if (!cryptoPriceUsd || cryptoPriceUsd <= 0) {
+      setBuyCalculation(null);
+      return;
     }
+
+    // Calculate USD value and gold grams
+    const cryptoValueUsd = amount * cryptoPriceUsd;
+    const goldGrams = cryptoValueUsd / goldPrice;
+
+    // Fee (0.5%) displayed in USD
+    const feeRate = 0.005;
+    const feeUsd = cryptoValueUsd * feeRate;
+
+    setBuyCalculation({
+      cryptoCurrency: buyCurrency,
+      cryptoAmount: amount,
+      cryptoPriceUsd,
+      goldPricePerGram: goldPrice,
+      goldGrams,
+      goldValueUsd: cryptoValueUsd,
+      fee: feeUsd,
+      netAmount: cryptoValueUsd - feeUsd
+    });
   };
   
   const calculateSell = async () => {
-    if (!sellGoldAmount || parseFloat(sellGoldAmount) <= 0) {
+    const grams = parseFloat(sellGoldAmount || '0');
+    if (!grams || grams <= 0 || goldPrice <= 0) {
       setSellCalculation(null);
       return;
     }
-    
-    try {
-      const response = await api.post('/api/gold-exchange/calculate-sell', {
-        goldGrams: parseFloat(sellGoldAmount),
-        targetCurrency: sellCurrency
-      });
-      
-      setSellCalculation(response.data);
-    } catch (error) {
-      console.error('Calculate sell error:', error);
+
+    // Resolve crypto price based on selected currency
+    const cryptoPriceUsd = sellCurrency === 'BTC' ? btcPrice : sellCurrency === 'ETH' ? ethPrice : usdtPrice;
+    if (!cryptoPriceUsd || cryptoPriceUsd <= 0) {
+      setSellCalculation(null);
+      return;
     }
+
+    // Calculate USD value and crypto received
+    const goldValueUsd = grams * goldPrice;
+    const cryptoAmount = goldValueUsd / cryptoPriceUsd;
+
+    // Fee (0.5%) displayed in USD and deducted in crypto
+    const feeRate = 0.005;
+    const feeUsd = goldValueUsd * feeRate;
+    const netCryptoAmount = cryptoAmount * (1 - feeRate);
+
+    setSellCalculation({
+      cryptoCurrency: sellCurrency,
+      cryptoAmount: netCryptoAmount,
+      cryptoPriceUsd,
+      goldPricePerGram: goldPrice,
+      goldGrams: grams,
+      goldValueUsd,
+      fee: feeUsd,
+      netAmount: netCryptoAmount
+    });
   };
   
   const executeBuy = async () => {
@@ -162,8 +195,8 @@ export default function ExchangePage() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       const response = await api.post('/api/gold-exchange/gold-to-crypto', {
-        goldGrams: parseFloat(sellGoldAmount),
-        targetCurrency: sellCurrency
+        cryptoCurrency: sellCurrency,
+        goldGrams: parseFloat(sellGoldAmount)
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });

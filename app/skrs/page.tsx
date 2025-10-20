@@ -94,28 +94,41 @@ export default function SKRsPage() {
 
   const loadSKRData = async () => {
     try {
-      // Load SKR data from backend
-      const response = await api.get('/api/skrs');
-      const holdings = response.data || [];
-      
-      // Transform to SKR records format
-      const transformedRecords: SKRRecord[] = holdings.map((holding: any, index: number) => ({
-        id: holding.id || `skr-${index}`,
-        referenceNumber: holding.referenceNumber || `SKR-${String(index + 1).padStart(6, '0')}`,
-        goldAmount: holding.amount || holding.weightGrams || 0,
-        purchaseDate: holding.purchaseDate || holding.createdAt || new Date().toISOString(),
-        purchasePrice: holding.purchasePrice || holding.purchasePricePerGram || 0,
-        currentPrice: holding.currentPrice || 0,
-        profitLoss: holding.profitLoss || 0,
-        profitLossPercent: holding.profitLossPercent || 0,
-        status: (holding.status || 'holding') as 'holding' | 'sold' | 'pending',
-        checked: false
-      }));
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      // Pull user gold holdings and current gold price
+      const [holdingsRes, priceRes] = await Promise.all([
+        api.get('/api/gold-exchange/holdings', { headers: { Authorization: `Bearer ${token}` } }),
+        api.get('/api/prices/gold/current')
+      ]);
+
+      const holdings = holdingsRes.data?.holdings || [];
+      const pricePerGram = parseFloat(priceRes.data?.pricePerGram || 0);
+
+      console.log('SKR Holdings data:', holdings);
+
+      const transformedRecords: SKRRecord[] = holdings.map((h: any, index: number) => {
+        const grams = parseFloat(h.weight_grams || h.weightGrams || h.grams || 0);
+        const purchasePrice = parseFloat(h.purchase_price_per_gram || h.purchasePricePerGram || 0);
+        const currentPrice = pricePerGram;
+        const profitLoss = (currentPrice - purchasePrice) * grams;
+        const profitLossPercent = purchasePrice > 0 ? (profitLoss / (purchasePrice * grams)) : 0;
+        return {
+          id: h.id || `skr-${index}`,
+          referenceNumber: h.skr_reference || h.referenceNumber || `SKR-${String(index + 1).padStart(6, '0')}`,
+          goldAmount: grams,
+          purchaseDate: h.created_at || h.purchaseDate || new Date().toISOString(),
+          purchasePrice,
+          currentPrice,
+          profitLoss,
+          profitLossPercent,
+          status: (h.status || 'holding') as 'holding' | 'sold' | 'pending',
+          checked: false
+        };
+      });
 
       setSkrRecords(transformedRecords);
     } catch (error) {
       console.error('Error loading SKR data:', error);
-      // Set empty array if API fails
       setSkrRecords([]);
     } finally {
       setLoading(false);
@@ -126,9 +139,9 @@ export default function SKRsPage() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       if (token) {
-      await api.post('/api/auth/logout', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        await api.post('/api/auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -136,6 +149,33 @@ export default function SKRsPage() {
       Cookies.remove('authToken');
       sessionStorage.removeItem('authToken');
       router.push('/login');
+    }
+  };
+
+
+  const downloadIndividualSKRPDF = async (skrId: string) => {
+    try {
+      console.log('Downloading SKR PDF for ID:', skrId);
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:5000/api/exports/skrs/${skrId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `skr_${skrId}_${Date.now()}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to download individual SKR PDF:', response.status, errorData);
+        alert(`Failed to download PDF: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error downloading individual SKR PDF:', error);
     }
   };
 
@@ -418,23 +458,34 @@ export default function SKRsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
-                        onClick={() => {
-                          setSelectedSKR(record);
-                          setShowModal(true);
-                        }}
-                        className="text-primary-600 hover:text-primary-900 mr-4"
-                      >
-                        View
-                      </button>
-                      {record.status === 'holding' && (
-                        <Link
-                          href={`/exchange?action=sell&amount=${record.goldAmount}`}
-                          className="text-red-600 hover:text-red-900"
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => {
+                            setSelectedSKR(record);
+                            setShowModal(true);
+                          }}
+                          className="text-primary-600 hover:text-primary-900"
                         >
-                          Sell
-                        </Link>
-                      )}
+                          View
+                        </button>
+                        <button
+                          onClick={() => downloadIndividualSKRPDF(record.id)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors duration-200"
+                          title="Download PDF"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </button>
+                        {record.status === 'holding' && (
+                          <Link
+                            href={`/exchange?action=sell&amount=${record.goldAmount}`}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Sell
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

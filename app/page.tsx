@@ -146,11 +146,15 @@ export default function Dashboard() {
     }
   }, [depositCurrency, mmConnected]);
 
-  // Load user balances and crypto prices when component mounts
+  // Load user balances, transactions, and crypto prices when component mounts
   useEffect(() => {
     if (user?.id) {
       loadUserBalances();
-      getCryptoPrices().then(prices => setCryptoPrices(prices));
+      // Load crypto prices first, then transactions (so USD calculations work)
+      getCryptoPrices().then(prices => {
+        setCryptoPrices(prices);
+        loadTransactions(); // Load transactions after prices are set
+      });
     }
   }, [user?.id]);
 
@@ -187,21 +191,30 @@ export default function Dashboard() {
       // Load user platform balances
       await loadUserBalances();
       
-      // Load crypto prices
+      // Load crypto prices first, then transactions (so USD calculations work)
       const prices = await getCryptoPrices();
       setCryptoPrices(prices);
+      await loadTransactions();
 
-      // Load gold holdings
-      const goldResponse = await api.get('/api/gold-holdings', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setGoldHoldings(goldResponse.data.holdings || []);
+      // Load gold holdings (off-chain) and current gold price
+      const [goldHoldingsRes, goldPriceRes] = await Promise.all([
+        api.get('/api/gold-exchange/holdings', { headers: { Authorization: `Bearer ${token}` } }),
+        api.get('/api/prices/gold/current')
+      ]);
+      const totalActiveGrams = parseFloat(goldHoldingsRes.data?.totalActiveGrams || 0);
+      const goldPricePerGram = parseFloat(goldPriceRes.data?.pricePerGram || 0);
+      const totalGoldUsd = totalActiveGrams * goldPricePerGram;
+      // Represent total gold value as a single summarized holding for the dashboard cards
+      setGoldHoldings(totalGoldUsd > 0 ? [{ 
+        id: 'TOTAL', 
+        amount: totalActiveGrams, 
+        unit: 'g', 
+        purchasePrice: 0, // Will be calculated from individual holdings if needed
+        currentPrice: goldPricePerGram,
+        profit: 0, // Will be calculated from individual holdings if needed
+        currentValue: totalGoldUsd 
+      }] : []);
 
-      // Load recent transactions
-      const transactionsResponse = await api.get('/api/transactions/recent', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRecentTransactions(transactionsResponse.data.transactions || []);
 
       // Load SKR receipts
       const skrResponse = await api.get('/api/skrs', {
@@ -489,9 +502,75 @@ export default function Dashboard() {
     }
   };
 
+  const loadTransactions = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.get('/api/wallet/transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data && Array.isArray(response.data)) {
+        const transactions: Transaction[] = response.data.map((tx: any) => {
+          const cryptoAmount = parseFloat(tx.amount || 0);
+          const currency = tx.currency || 'USD';
+          
+          // Calculate USD equivalent for crypto transactions
+          let usdAmount = cryptoAmount;
+          if (currency === 'BTC' && cryptoPrices.BTC) {
+            usdAmount = cryptoAmount * cryptoPrices.BTC;
+          } else if (currency === 'ETH' && cryptoPrices.ETH) {
+            usdAmount = cryptoAmount * cryptoPrices.ETH;
+          } else if (currency === 'USDT' && cryptoPrices.USDT) {
+            usdAmount = cryptoAmount * cryptoPrices.USDT;
+          }
+          
+          return {
+            id: tx.id || tx.transactionId || `tx-${Date.now()}`,
+            type: tx.type || 'unknown',
+            amount: usdAmount, // Use USD equivalent for display
+            currency: 'USD', // Always display as USD in Recent Activity
+            description: tx.description || tx.meta?.description || 'Transaction',
+            timestamp: tx.timestamp || tx.createdAt || new Date().toISOString(),
+            status: tx.status || 'completed'
+          };
+        });
+        
+        // Sort by timestamp (most recent first)
+        transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setRecentTransactions(transactions);
+      }
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      setRecentTransactions([]);
+    }
+  };
+
+  const downloadGoldHoldingsPDF = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5000/api/exports/gold-holdings/pdf', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gold_holdings_report_${Date.now()}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to download gold holdings PDF');
+      }
+    } catch (error) {
+      console.error('Error downloading gold holdings PDF:', error);
+    }
+  };
+
   const getCryptoPrices = async () => {
     try {
-      const response = await api.get('/api/prices');
+      const response = await api.get('/api/prices/crypto');
       if (response.data) {
         return {
           BTC: response.data.BTC || 50000,
@@ -532,6 +611,8 @@ export default function Dashboard() {
       
       console.log('✅ Deposit intent created:', depositIntent.data);
 
+      let txHash = '';
+
       if (depositCurrency === 'ETH') {
         if (!mmConnected) throw new Error('Please connect MetaMask first');
         
@@ -542,7 +623,7 @@ export default function Dashboard() {
         });
         
         const valueHex = '0x' + Math.floor(parseFloat(depositAmount) * 1e18).toString(16);
-        const txHash = await (window as any).ethereum.request({
+        txHash = await (window as any).ethereum.request({
           method: 'eth_sendTransaction',
           params: [{ from: mmAddress, to: poolAddress, value: valueHex }]
         });
@@ -566,7 +647,7 @@ export default function Dashboard() {
         const amountHex = BigInt(Math.floor(parseFloat(depositAmount) * 1e6)).toString(16).padStart(64, '0');
         const data = methodId + toPadded + amountHex;
         
-        const txHash = await (window as any).ethereum.request({
+        txHash = await (window as any).ethereum.request({
           method: 'eth_sendTransaction',
           params: [{ from: mmAddress, to: token, data }]
         });
@@ -576,10 +657,32 @@ export default function Dashboard() {
       } else if (depositCurrency === 'BTC') {
         // BTC handled by external wallet; just surface address
         setDepositSuccess(`Send BTC to: ${poolAddress}`);
+        return; // No transaction hash for BTC, so no processing needed
       }
 
-      // Refresh platform balances after successful deposit
+      // Process the deposit to credit user balance (for ETH and USDT)
+      if (txHash && (depositCurrency === 'ETH' || depositCurrency === 'USDT')) {
+        console.log('🔄 Processing deposit to credit user balance...');
+        
+        try {
+          const processResponse = await api.post('/api/wallet/process-deposit', {
+            currency: depositCurrency,
+            amount: parseFloat(depositAmount),
+            transactionHash: txHash,
+            fromAddress: mmAddress
+          });
+          
+          console.log('✅ Deposit processed successfully:', processResponse.data);
+          setDepositSuccess(`Deposit successful! Your balance has been updated. New ${depositCurrency} balance: ${processResponse.data.newBalance}`);
+        } catch (processError: any) {
+          console.error('❌ Error processing deposit:', processError);
+          setDepositError(`Transaction sent but failed to credit balance: ${processError.response?.data?.message || processError.message}`);
+        }
+      }
+
+      // Refresh platform balances and transactions after successful deposit
       await loadUserBalances();
+      await loadTransactions();
       
       // Refresh MetaMask balance
       if (mmAddress) {
@@ -773,24 +876,51 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Crypto Balance */}
+          {/* BTC Balance */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Crypto Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCryptoValue)}</p>
-                {!hasCryptoData && (
-                  <p className="text-xs text-gray-500 mt-1">No crypto balances yet</p>
-                )}
+                <p className="text-sm font-medium text-gray-600">BTC Balance</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.BTC)}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.BTC * cryptoPrices.BTC)}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
+              <div className="h-12 w-12 bg-orange-50 rounded-lg flex items-center justify-center">
+                <span className="text-orange-600 font-bold text-lg">₿</span>
               </div>
             </div>
           </div>
 
+          {/* ETH Balance */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">ETH Balance</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.ETH)}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.ETH * cryptoPrices.ETH)}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 font-bold text-lg">Ξ</span>
+              </div>
+            </div>
+          </div>
+
+          {/* USDT Balance */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">USDT Balance</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.USDT)}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.USDT * cryptoPrices.USDT)}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 font-bold text-lg">₮</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Portfolio Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Gold Holdings */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
@@ -799,6 +929,17 @@ export default function Dashboard() {
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalGoldValue)}</p>
                 {!hasGoldData && (
                   <p className="text-xs text-gray-500 mt-1">No gold holdings yet</p>
+                )}
+                {hasGoldData && (
+                  <button
+                    onClick={downloadGoldHoldingsPDF}
+                    className="mt-2 text-xs text-primary-600 hover:text-primary-700 flex items-center space-x-1"
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Download PDF</span>
+                  </button>
                 )}
               </div>
               <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
@@ -824,6 +965,24 @@ export default function Dashboard() {
               <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Crypto Value */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Crypto Value</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCryptoValue)}</p>
+                {!hasCryptoData && (
+                  <p className="text-xs text-gray-500 mt-1">No crypto balances yet</p>
+                )}
+              </div>
+              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
             </div>

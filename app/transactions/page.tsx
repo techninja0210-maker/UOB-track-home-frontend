@@ -94,59 +94,31 @@ export default function TransactionsPage() {
   const loadTransactions = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await api.get('/api/transactions', {
+      const response = await api.get('/api/wallet/transactions', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
+      console.log('📋 Raw transaction data:', response.data);
+      
       // Transform the data to match our interface
       const transformedTransactions: Transaction[] = (response.data || []).map((tx: any) => ({
-        id: tx.id || tx.transactionId || `tx-${Math.random().toString(36).substr(2, 9)}`,
+        id: tx.id || `tx-${Math.random().toString(36).substr(2, 9)}`,
         type: tx.type || 'deposit',
-        amount: tx.amount || tx.value || 0,
-        currency: tx.currency || tx.symbol || 'USD',
-        status: tx.status || 'pending',
-        timestamp: tx.timestamp || tx.createdAt || new Date().toISOString(),
-        description: tx.description || tx.memo || `${tx.type} transaction`,
-        transactionHash: tx.transactionHash || tx.hash,
-        fee: tx.fee || 0
+        amount: tx.amount || 0,
+        currency: tx.currency || 'ETH',
+        status: tx.status || 'completed',
+        timestamp: tx.timestamp || new Date().toISOString(),
+        description: tx.description || (tx.type === 'buy_gold' && tx.goldGrams ? `Bought ${tx.goldGrams} g gold` : (tx.type === 'sell_gold' && tx.goldGrams ? `Sold ${tx.goldGrams} g gold` : `${tx.type} transaction`)),
+        transactionHash: tx.transactionHash,
+        fee: 0 // No fee data in current system
       }));
       
+      console.log('📋 Transformed transactions:', transformedTransactions);
       setTransactions(transformedTransactions);
     } catch (error) {
       console.error('Error loading transactions:', error);
-      // Set mock data if API fails
-      setTransactions([
-        {
-          id: 'tx-1',
-          type: 'buy_gold',
-          amount: 0.5,
-          currency: 'ETH',
-          status: 'completed',
-          timestamp: new Date(Date.now() - 86400000).toISOString(),
-          description: 'Bought 0.5g gold with 0.001 ETH',
-          fee: 0.0001
-        },
-        {
-          id: 'tx-2',
-          type: 'deposit',
-          amount: 0.01,
-          currency: 'BTC',
-          status: 'completed',
-          timestamp: new Date(Date.now() - 172800000).toISOString(),
-          description: 'Deposited 0.01 BTC to wallet',
-          transactionHash: '0x1234...5678'
-        },
-        {
-          id: 'tx-3',
-          type: 'sell_gold',
-          amount: 0.25,
-          currency: 'USDT',
-          status: 'pending',
-          timestamp: new Date(Date.now() - 259200000).toISOString(),
-          description: 'Sold 0.25g gold for USDT',
-          fee: 2.5
-        }
-      ]);
+      // Set empty array if API fails - no more mock data
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -156,9 +128,9 @@ export default function TransactionsPage() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       if (token) {
-      await api.post('/api/auth/logout', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        await api.post('/api/auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -166,6 +138,52 @@ export default function TransactionsPage() {
       Cookies.remove('authToken');
       sessionStorage.removeItem('authToken');
       router.push('/login');
+    }
+  };
+
+  const downloadTransactionsPDF = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5000/api/exports/transactions/pdf', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transactions_report_${Date.now()}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to download PDF');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    }
+  };
+
+  const downloadTransactionsCSV = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5000/api/exports/transactions/csv', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transactions_${Date.now()}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error('Failed to download CSV');
+      }
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
     }
   };
 
@@ -358,12 +376,32 @@ export default function TransactionsPage() {
               <h2 className="text-3xl font-bold text-gray-900">Transaction History</h2>
               <p className="mt-2 text-gray-600">View and track all your transactions</p>
             </div>
-            <Link
-              href="/exchange"
-              className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
-            >
-              New Transaction
-            </Link>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={downloadTransactionsPDF}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>PDF</span>
+              </button>
+              <button
+                onClick={downloadTransactionsCSV}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 flex items-center space-x-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>CSV</span>
+              </button>
+              <Link
+                href="/exchange"
+                className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+              >
+                New Transaction
+              </Link>
+            </div>
           </div>
         </div>
 
