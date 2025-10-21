@@ -8,6 +8,8 @@ import { formatCurrency, formatCrypto, formatNumber } from '@/lib/formatters';
 interface Transaction {
   id: string;
   user_id: string;
+  user_name?: string;
+  user_email?: string;
   type: string;
   currency: string;
   amount: number;
@@ -15,11 +17,17 @@ interface Transaction {
   created_at: string;
   transaction_hash?: string;
   description?: string;
+  from_address?: string;
+  to_address?: string;
+  gold_grams?: number;
+  gold_price_per_gram?: number;
 }
 
 interface Withdrawal {
   id: string;
   user_id: string;
+  user_name?: string;
+  user_email?: string;
   currency: string;
   amount: number;
   destination_address: string;
@@ -27,6 +35,7 @@ interface Withdrawal {
   created_at: string;
   fee: number;
   net_amount: number;
+  transaction_hash?: string;
 }
 
 export default function AdminTransactions() {
@@ -63,40 +72,7 @@ export default function AdminTransactions() {
       setTransactions(response.data || []);
     } catch (error) {
       console.error('Error loading transactions:', error);
-      // Mock data for development
-      setTransactions([
-        {
-          id: '1',
-          user_id: 'user-1',
-          type: 'deposit',
-          currency: 'ETH',
-          amount: 0.5,
-          status: 'completed',
-          created_at: new Date().toISOString(),
-          transaction_hash: '0x1234...5678',
-          description: 'ETH deposit to wallet'
-        },
-        {
-          id: '2',
-          user_id: 'user-2',
-          type: 'buy_gold',
-          currency: 'USD',
-          amount: 2500,
-          status: 'completed',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          description: 'Bought 1.2g gold'
-        },
-        {
-          id: '3',
-          user_id: 'user-3',
-          type: 'sell_gold',
-          currency: 'USDT',
-          amount: 1800,
-          status: 'pending',
-          created_at: new Date(Date.now() - 172800000).toISOString(),
-          description: 'Sold 0.8g gold'
-        }
-      ]);
+      setTransactions([]);
     }
   };
 
@@ -106,38 +82,17 @@ export default function AdminTransactions() {
       setWithdrawals(response.data || []);
     } catch (error) {
       console.error('Error loading withdrawals:', error);
-      // Mock data for development
-      setWithdrawals([
-        {
-          id: '1',
-          user_id: 'user-1',
-          currency: 'BTC',
-          amount: 0.1,
-          destination_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          fee: 0.001,
-          net_amount: 0.099
-        },
-        {
-          id: '2',
-          user_id: 'user-2',
-          currency: 'ETH',
-          amount: 2.0,
-          destination_address: '0x742d35Cc6634C0532925a3b8D2D3B2c7d8E9f0A1',
-          status: 'completed',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          fee: 0.01,
-          net_amount: 1.99
-        }
-      ]);
+      setWithdrawals([]);
     }
   };
 
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (transaction.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+                         (transaction.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.user_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.transaction_hash || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
     const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
     
@@ -147,6 +102,8 @@ export default function AdminTransactions() {
   const filteredWithdrawals = withdrawals.filter(withdrawal => {
     const matchesSearch = withdrawal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          withdrawal.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (withdrawal.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (withdrawal.user_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          withdrawal.destination_address.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || withdrawal.status === statusFilter;
     
@@ -456,6 +413,11 @@ export default function AdminTransactions() {
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
                             {transaction.description || transaction.type.replace('_', ' ')}
+                            {transaction.gold_grams && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                ({transaction.gold_grams}g gold)
+                              </span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">
                             ID: {transaction.id}
@@ -463,8 +425,13 @@ export default function AdminTransactions() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.user_id}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {transaction.user_name || 'Unknown User'}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {transaction.user_email || transaction.user_id}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
@@ -480,20 +447,23 @@ export default function AdminTransactions() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(transaction.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900 mr-4">
-                        View
-                      </button>
-                      {transaction.transaction_hash && (
-                        <a
-                          href={`https://etherscan.io/tx/${transaction.transaction_hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          Explorer
-                        </a>
-                      )}
+                    <td className="px-6 py-4 text-sm font-medium min-w-[120px]">
+                      <div className="flex flex-col space-y-1">
+                        <button className="text-primary-600 hover:text-primary-900 text-left">
+                          View
+                        </button>
+                        {transaction.transaction_hash && (
+                          <a
+                            href={`https://sepolia.etherscan.io/tx/${transaction.transaction_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-900 text-left text-xs"
+                            title={`View transaction on Etherscan: ${transaction.transaction_hash}`}
+                          >
+                            Explorer
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -513,8 +483,13 @@ export default function AdminTransactions() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {withdrawal.user_id}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {withdrawal.user_name || 'Unknown User'}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {withdrawal.user_email || withdrawal.user_id}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
@@ -533,19 +508,32 @@ export default function AdminTransactions() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCrypto(withdrawal.fee, withdrawal.currency)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900 mr-4">
-                        View
-                      </button>
-                      {withdrawal.status === 'pending' && (
-                        <button
-                          onClick={() => processWithdrawal(withdrawal.id)}
-                          disabled={processingId === withdrawal.id}
-                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                        >
-                          {processingId === withdrawal.id ? 'Processing...' : 'Process'}
+                    <td className="px-6 py-4 text-sm font-medium min-w-[120px]">
+                      <div className="flex flex-col space-y-1">
+                        <button className="text-primary-600 hover:text-primary-900 text-left">
+                          View
                         </button>
-                      )}
+                        {withdrawal.status === 'pending' && (
+                          <button
+                            onClick={() => processWithdrawal(withdrawal.id)}
+                            disabled={processingId === withdrawal.id}
+                            className="text-green-600 hover:text-green-900 disabled:opacity-50 text-left text-xs"
+                          >
+                            {processingId === withdrawal.id ? 'Processing...' : 'Process'}
+                          </button>
+                        )}
+                        {withdrawal.transaction_hash && (
+                          <a
+                            href={`https://sepolia.etherscan.io/tx/${withdrawal.transaction_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-900 text-left text-xs"
+                            title={`View transaction on Etherscan: ${withdrawal.transaction_hash}`}
+                          >
+                            Explorer
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

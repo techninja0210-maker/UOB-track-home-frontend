@@ -8,6 +8,8 @@ import { formatCurrency, formatNumber } from '@/lib/formatters';
 interface SKR {
   id: string;
   user_id: string;
+  user_name?: string;
+  user_email?: string;
   skr_number: string;
   gold_weight: number;
   gold_purity: number;
@@ -38,48 +40,7 @@ export default function AdminSKRs() {
       setSkrs(response.data || []);
     } catch (error) {
       console.error('Error loading SKRs:', error);
-      // Mock data for development
-      setSkrs([
-        {
-          id: '1',
-          user_id: 'user-1',
-          skr_number: 'SKR-000001',
-          gold_weight: 1.5,
-          gold_purity: 99.9,
-          storage_location: 'Vault A-1',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          current_value: 3000,
-          profit_loss: 150
-        },
-        {
-          id: '2',
-          user_id: 'user-2',
-          skr_number: 'SKR-000002',
-          gold_weight: 2.0,
-          gold_purity: 99.5,
-          storage_location: 'Vault B-2',
-          status: 'active',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          expiry_date: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toISOString(),
-          current_value: 4000,
-          profit_loss: -50
-        },
-        {
-          id: '3',
-          user_id: 'user-3',
-          skr_number: 'SKR-000003',
-          gold_weight: 0.5,
-          gold_purity: 99.9,
-          storage_location: 'Vault C-1',
-          status: 'expired',
-          created_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(),
-          expiry_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          current_value: 1000,
-          profit_loss: 25
-        }
-      ]);
+      setSkrs([]);
     } finally {
       setLoading(false);
     }
@@ -88,9 +49,13 @@ export default function AdminSKRs() {
   const filteredSKRs = skrs.filter(skr => {
     const skrNumber = skr.skr_number || '';
     const userId = skr.user_id || '';
+    const userName = skr.user_name || '';
+    const userEmail = skr.user_email || '';
     const storageLocation = skr.storage_location || '';
     const matchesSearch = skrNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          storageLocation.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || (skr.status || 'pending') === statusFilter;
     return matchesSearch && matchesStatus;
@@ -106,7 +71,7 @@ export default function AdminSKRs() {
   };
 
   const formatWeight = (weight: number) => {
-    return `${formatNumber(weight, 4)} oz`;
+    return `${formatNumber(weight, 4)} g`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -164,7 +129,7 @@ export default function AdminSKRs() {
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-        </div>
+      </div>
       </AdminLayout>
     );
   }
@@ -176,7 +141,7 @@ export default function AdminSKRs() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">SKR Management</h1>
           <p className="mt-2 text-gray-600">Manage Secure Key Receipts and gold holdings</p>
-        </div>
+          </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -185,14 +150,14 @@ export default function AdminSKRs() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total SKRs</p>
                 <p className="text-2xl font-bold text-gray-900">{skrs.length}</p>
-              </div>
+          </div>
               <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-              </div>
+        </div>
             </div>
-          </div>
+            </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
@@ -201,29 +166,29 @@ export default function AdminSKRs() {
                 <p className="text-2xl font-bold text-green-600">
                   {skrs.filter(skr => skr.status === 'active').length}
                 </p>
-              </div>
+          </div>
               <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-            </div>
-          </div>
+        </div>
+      </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Gold</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {formatNumber(skrs.reduce((sum, skr) => sum + skr.gold_weight, 0), 2)} oz
+                  {formatNumber(skrs.reduce((sum, skr) => sum + skr.gold_weight, 0), 2)} g
                 </p>
-              </div>
+          </div>
               <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
                 <span className="text-yellow-600 text-xl">🥇</span>
-              </div>
-            </div>
           </div>
-
+          </div>
+          </div>
+          
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
               <div>
@@ -231,15 +196,15 @@ export default function AdminSKRs() {
                 <p className="text-2xl font-bold text-purple-600">
                   {formatCurrency(skrs.reduce((sum, skr) => sum + (skr.current_value || 0), 0))}
                 </p>
-              </div>
+          </div>
               <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
-              </div>
+        </div>
             </div>
           </div>
-        </div>
+              </div>
 
         {/* Filters */}
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft mb-6">
@@ -248,20 +213,20 @@ export default function AdminSKRs() {
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                 Search SKRs
               </label>
-              <input
-                type="text"
+                <input 
+                  type="text" 
                 id="search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Search by SKR number, user ID, or location..."
-              />
-            </div>
+                />
+              </div>
             <div>
               <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
                 Status
               </label>
-              <select
+                <select 
                 id="status-filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -273,8 +238,8 @@ export default function AdminSKRs() {
                 <option value="redeemed">Redeemed</option>
                 <option value="suspended">Suspended</option>
                 <option value="pending">Pending</option>
-              </select>
-            </div>
+                </select>
+              </div>
             <div className="flex items-end">
               <button
                 onClick={() => {
@@ -285,9 +250,9 @@ export default function AdminSKRs() {
               >
                 Clear Filters
               </button>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* SKRs Table */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-soft overflow-hidden">
@@ -327,7 +292,12 @@ export default function AdminSKRs() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{skr.skr_number}</div>
-                        <div className="text-sm text-gray-500">User: {skr.user_id}</div>
+                        <div className="text-sm text-gray-500">
+                          {skr.user_name || 'Unknown User'}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {skr.user_email || skr.user_id}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -359,7 +329,7 @@ export default function AdminSKRs() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
+                      <button 
                         onClick={() => openSKRModal(skr)}
                         className="text-primary-600 hover:text-primary-900 mr-4"
                       >
@@ -385,7 +355,7 @@ export default function AdminSKRs() {
                 <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-              </div>
+          </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No SKRs found</h3>
               <p className="text-gray-500">No SKRs match your current filters.</p>
             </div>
@@ -409,20 +379,20 @@ export default function AdminSKRs() {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">SKR Number</label>
                   <p className="text-sm text-gray-900">{selectedSKR.skr_number}</p>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">User ID</label>
                   <p className="text-sm text-gray-900">{selectedSKR.user_id}</p>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Gold Weight</label>
                   <p className="text-sm text-gray-900">{formatWeight(selectedSKR.gold_weight)}</p>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Gold Purity</label>
                   <div className="mt-1">
@@ -432,17 +402,17 @@ export default function AdminSKRs() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Storage Location</label>
                   <p className="text-sm text-gray-900">{selectedSKR.storage_location}</p>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
                   <div className="mt-1">
                     {getStatusBadge(selectedSKR.status)}
                   </div>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Created</label>
                   <p className="text-sm text-gray-900">{formatDate(selectedSKR.created_at)}</p>
-                </div>
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Expiry Date</label>
                   <p className="text-sm text-gray-900">{formatDate(selectedSKR.expiry_date)}</p>
@@ -451,7 +421,7 @@ export default function AdminSKRs() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Current Value</label>
                     <p className="text-sm text-gray-900">{formatCurrency(selectedSKR.current_value)}</p>
-                  </div>
+              </div>
                 )}
                 {selectedSKR.profit_loss !== undefined && (
                   <div>
@@ -459,21 +429,21 @@ export default function AdminSKRs() {
                     <p className={`text-sm font-medium ${selectedSKR.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {selectedSKR.profit_loss >= 0 ? '+' : ''}{formatCurrency(selectedSKR.profit_loss)}
                     </p>
-                  </div>
+                </div>
                 )}
               </div>
-              
+
               <div className="mt-6 flex space-x-3">
                 <button className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200">
                   Edit SKR
-                </button>
+                  </button>
                 <button className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200">
                   Transfer
-                </button>
-              </div>
+              </button>
             </div>
           </div>
         </div>
+    </div>
       )}
     </AdminLayout>
   );
