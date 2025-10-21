@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import api from '@/lib/api';
 
 export default function SignupPage() {
@@ -54,7 +55,7 @@ export default function SignupPage() {
       default:
         isValid = false;
     }
-
+    
     setFieldValidation(prev => ({
       ...prev,
       [name]: isValid
@@ -117,26 +118,52 @@ export default function SignupPage() {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <div className="h-16 w-16 bg-primary-600 rounded-2xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">U</span>
+    <div className="min-h-screen bg-white flex">
+      {/* Left Side - Logo and Welcome */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-50 to-primary-100 flex-col justify-center items-center px-12">
+        <div className="text-center">
+          {/* Logo */}
+          <div className="mb-8">
+            <Image
+              src="/UOB_logo.png"
+              alt="UOB Security House"
+              width={200}
+              height={200}
+              className="h-48 w-48 object-contain mx-auto"
+              priority
+            />
           </div>
+          
+          {/* Welcome Text */}
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Join UOB Security House
+          </h1>
+          <p className="text-lg text-gray-600 max-w-md">
+            Start your journey in secure cryptocurrency and gold trading. 
+            Create your account and unlock the future of digital assets.
+          </p>
         </div>
-        
-        {/* Title */}
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Join UOB Security House to start trading
-        </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-soft sm:rounded-xl sm:px-10 border border-gray-200">
+      {/* Right Side - Signup Form */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16">
+        <div className="max-w-md mx-auto w-full">
+          {/* Mobile Logo (visible on small screens) */}
+          <div className="lg:hidden text-center mb-8">
+            <Image
+              src="/UOB_logo.png"
+              alt="UOB Security House"
+              width={120}
+              height={120}
+              className="h-24 w-24 object-contain mx-auto"
+              priority
+            />
+            <h1 className="text-2xl font-bold text-gray-900 mt-4">
+              UOB Security House
+            </h1>
+          </div>
+
+          <div className="bg-white py-8 px-6 shadow-soft rounded-xl border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Full Name Field */}
             <div>
@@ -144,14 +171,14 @@ export default function SignupPage() {
                 Full Name
               </label>
               <div className="mt-1">
-                <input
+            <input 
                   id="fullName"
                   name="fullName"
-                  type="text"
+              type="text" 
                   autoComplete="name"
                   required
                   value={formData.fullName}
-                  onChange={handleChange}
+              onChange={handleChange}
                   className={`appearance-none block w-full px-3 py-2 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200 ${
                     fieldValidation.fullName ? 'border-green-300' : formData.fullName ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -160,23 +187,23 @@ export default function SignupPage() {
                 {formData.fullName && !fieldValidation.fullName && (
                   <p className="mt-1 text-xs text-red-600">Name must be at least 2 characters</p>
                 )}
-              </div>
-            </div>
-
+          </div>
+        </div>
+        
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
               </label>
               <div className="mt-1">
-                <input
+            <input 
                   id="email"
                   name="email"
-                  type="email"
+              type="email" 
                   autoComplete="email"
                   required
-                  value={formData.email}
-                  onChange={handleChange}
+              value={formData.email}
+              onChange={handleChange}
                   className={`appearance-none block w-full px-3 py-2 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200 ${
                     fieldValidation.email ? 'border-green-300' : formData.email ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -185,23 +212,23 @@ export default function SignupPage() {
                 {formData.email && !fieldValidation.email && (
                   <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
                 )}
-              </div>
-            </div>
-
+          </div>
+        </div>
+        
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
               <div className="mt-1">
-                <input
+            <input 
                   id="password"
                   name="password"
-                  type="password"
+              type="password" 
                   autoComplete="new-password"
                   required
-                  value={formData.password}
-                  onChange={handleChange}
+              value={formData.password}
+              onChange={handleChange}
                   className={`appearance-none block w-full px-3 py-2 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200 ${
                     fieldValidation.password ? 'border-green-300' : formData.password ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -233,25 +260,25 @@ export default function SignupPage() {
                         passwordStrength === 3 ? 'Medium' : 'Strong'
                       }
                     </p>
-                  </div>
-                )}
-              </div>
             </div>
-
+                )}
+          </div>
+        </div>
+        
             {/* Confirm Password Field */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                 Confirm Password
               </label>
               <div className="mt-1">
-                <input
+            <input 
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
+              type="password" 
                   autoComplete="new-password"
                   required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
+              value={formData.confirmPassword}
+              onChange={handleChange}
                   className={`appearance-none block w-full px-3 py-2 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200 ${
                     fieldValidation.confirmPassword ? 'border-green-300' : formData.confirmPassword ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -262,15 +289,15 @@ export default function SignupPage() {
                 )}
               </div>
             </div>
-
-            {/* Terms and Conditions */}
+        
+        {/* Terms and Conditions */}
             <div className="flex items-center">
-              <input
+            <input 
                 id="terms"
                 name="terms"
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
+              type="checkbox" 
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
@@ -282,8 +309,8 @@ export default function SignupPage() {
                 <Link href="/privacy" className="text-primary-600 hover:text-primary-500">
                   Privacy Policy
                 </Link>
-              </label>
-            </div>
+            </label>
+          </div>
 
             {/* Message Display */}
             {message && (
@@ -334,6 +361,7 @@ export default function SignupPage() {
                 Sign in to your account
               </Link>
             </div>
+          </div>
           </div>
         </div>
       </div>

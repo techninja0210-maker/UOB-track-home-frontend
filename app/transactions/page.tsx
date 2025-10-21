@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatCrypto } from '@/lib/formatters';
@@ -128,9 +129,9 @@ export default function TransactionsPage() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       if (token) {
-        await api.post('/api/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      await api.post('/api/auth/logout', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -275,35 +276,40 @@ export default function TransactionsPage() {
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-3">
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">U</span>
-                </div>
+                <Image
+                  src="/UOB_logo.png"
+                  alt="UOB Security House"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-lg object-contain"
+                  priority
+                />
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
                   <p className="text-xs text-gray-500">Secure Gold Trading</p>
-                </div>
+          </div>
               </Link>
-            </div>
-
+        </div>
+        
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Dashboard
-              </Link>
+          </Link>
               <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 SKRs
-              </Link>
+          </Link>
               <Link href="/transactions" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
                 Transactions
-              </Link>
+          </Link>
               <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Exchange
-              </Link>
+          </Link>
             </div>
 
             {/* User Profile */}
             <div className="relative user-profile">
-              <button
+              <button 
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 className="flex items-center space-x-3 text-sm rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors duration-200"
               >
@@ -320,7 +326,7 @@ export default function TransactionsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-
+              
               {showProfileDropdown && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   <div className="px-4 py-3 border-b border-gray-200">
@@ -377,27 +383,28 @@ export default function TransactionsPage() {
               <p className="mt-2 text-gray-600">View and track all your transactions</p>
             </div>
             <div className="flex items-center space-x-3">
-              <button
+                <button 
                 onClick={downloadTransactionsPDF}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 flex items-center space-x-2"
-              >
+                >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span>PDF</span>
-              </button>
-              <button
+                </button>
+                <button 
                 onClick={downloadTransactionsCSV}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 flex items-center space-x-2"
-              >
+                >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span>CSV</span>
-              </button>
+                </button>
               <Link
                 href="/exchange"
                 className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+                style={{ color: 'white' }}
               >
                 New Transaction
               </Link>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/formatters';
@@ -122,7 +123,7 @@ export default function SKRsPage() {
           profitLoss,
           profitLossPercent,
           status: (h.status || 'holding') as 'holding' | 'sold' | 'pending',
-          checked: false
+        checked: false
         };
       });
 
@@ -139,9 +140,9 @@ export default function SKRsPage() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       if (token) {
-        await api.post('/api/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      await api.post('/api/auth/logout', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -163,12 +164,12 @@ export default function SKRsPage() {
       
       if (response.ok) {
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `skr_${skrId}_${Date.now()}.pdf`;
         a.click();
-        window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
       } else {
         const errorData = await response.json();
         console.error('Failed to download individual SKR PDF:', response.status, errorData);
@@ -208,30 +209,35 @@ export default function SKRsPage() {
             {/* Logo */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-3">
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">U</span>
-                </div>
+                <Image
+                  src="/UOB_logo.png"
+                  alt="UOB Security House"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-lg object-contain"
+                  priority
+                />
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
                   <p className="text-xs text-gray-500">Secure Gold Trading</p>
-                </div>
+          </div>
               </Link>
-            </div>
-
+        </div>
+        
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Dashboard
-              </Link>
+          </Link>
               <Link href="/skrs" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
                 SKRs
-              </Link>
+          </Link>
               <Link href="/transactions" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Transactions
-              </Link>
+          </Link>
               <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Exchange
-              </Link>
+          </Link>
             </div>
 
             {/* User Profile */}
@@ -263,7 +269,7 @@ export default function SKRsPage() {
                   <div className="py-1">
                     <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       Profile Settings
-                    </Link>
+          </Link>
                     <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       Account Settings
                     </Link>
@@ -280,7 +286,7 @@ export default function SKRsPage() {
               )}
             </div>
           </div>
-        </div>
+      </div>
 
         {/* Mobile Navigation */}
         <div className="md:hidden border-t border-gray-200 bg-gray-50">
@@ -297,8 +303,8 @@ export default function SKRsPage() {
             <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Exchange
             </Link>
+            </div>
           </div>
-        </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -312,6 +318,7 @@ export default function SKRsPage() {
             <Link
               href="/exchange"
               className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+              style={{ color: 'white' }}
             >
               Buy More Gold
             </Link>
@@ -325,26 +332,26 @@ export default function SKRsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Gold</p>
                 <p className="text-2xl font-bold text-yellow-600">{formatNumber(totalGoldAmount, 4)} g</p>
-              </div>
+                  </div>
               <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
                 <span className="text-yellow-600 text-xl">🥇</span>
-              </div>
-            </div>
-          </div>
+                  </div>
+                  </div>
+                  </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalValue)}</p>
-              </div>
+                </div>
               <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
-              </div>
             </div>
           </div>
+        </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
@@ -459,7 +466,7 @@ export default function SKRsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        <button 
+                      <button 
                           onClick={() => {
                             setSelectedSKR(record);
                             setShowModal(true);
@@ -467,7 +474,7 @@ export default function SKRsPage() {
                           className="text-primary-600 hover:text-primary-900"
                         >
                           View
-                        </button>
+                      </button>
                         <button
                           onClick={() => downloadIndividualSKRPDF(record.id)}
                           className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors duration-200"
@@ -537,7 +544,7 @@ export default function SKRsPage() {
             </div>
           </div>
         )}
-      </div>
+          </div>
 
       {/* SKR Detail Modal */}
       {showModal && selectedSKR && (
@@ -553,30 +560,30 @@ export default function SKRsPage() {
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </button>
-              </div>
+            </button>
+          </div>
               
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Reference Number</label>
                   <p className="text-sm text-gray-900">{selectedSKR.referenceNumber}</p>
-                </div>
+        </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Gold Amount</label>
                   <p className="text-sm text-gray-900">{formatNumber(selectedSKR.goldAmount, 4)} g</p>
-                </div>
+      </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
                   <p className="text-sm text-gray-900">{new Date(selectedSKR.purchaseDate).toLocaleDateString()}</p>
-              </div>
+            </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Purchase Price</label>
                   <p className="text-sm text-gray-900">{formatCurrency(selectedSKR.purchasePrice)}</p>
-                  </div>
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Current Price</label>
                   <p className="text-sm text-gray-900">{formatCurrency(selectedSKR.currentPrice)}</p>
-                  </div>
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Profit/Loss</label>
                   <p className={`text-sm font-medium ${selectedSKR.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -594,8 +601,8 @@ export default function SKRsPage() {
                   }`}>
                     {selectedSKR.status.charAt(0).toUpperCase() + selectedSKR.status.slice(1)}
                     </span>
+                  </div>
                 </div>
-              </div>
             </div>
           </div>
         </div>

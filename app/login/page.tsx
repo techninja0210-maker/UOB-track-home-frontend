@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
@@ -34,7 +35,7 @@ function LoginPage() {
       
       // Store token in both session storage and cookies (client-side only)
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('authToken', response.data.token);
+      sessionStorage.setItem('authToken', response.data.token);
         document.cookie = `authToken=${response.data.token}; path=/; max-age=86400`; // 24 hours
       }
 
@@ -56,26 +57,52 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <div className="h-16 w-16 bg-primary-600 rounded-2xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">U</span>
+    <div className="min-h-screen bg-white flex">
+      {/* Left Side - Logo and Welcome */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-50 to-primary-100 flex-col justify-center items-center px-12">
+        <div className="text-center">
+          {/* Logo */}
+          <div className="mb-8">
+            <Image
+              src="/UOB_logo.png"
+              alt="UOB Security House"
+              width={200}
+              height={200}
+              className="h-48 w-48 object-contain mx-auto"
+              priority
+            />
           </div>
+          
+          {/* Welcome Text */}
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Welcome to UOB Security House
+          </h1>
+          <p className="text-lg text-gray-600 max-w-md">
+            Your trusted partner for secure cryptocurrency and gold trading. 
+            Experience the future of digital asset management.
+          </p>
         </div>
-        
-        {/* Title */}
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          Welcome to UOB Security House
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in to your account to continue
-        </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-soft sm:rounded-xl sm:px-10 border border-gray-200">
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16">
+        <div className="max-w-md mx-auto w-full">
+          {/* Mobile Logo (visible on small screens) */}
+          <div className="lg:hidden text-center mb-8">
+            <Image
+              src="/UOB_logo.png"
+              alt="UOB Security House"
+              width={120}
+              height={120}
+              className="h-24 w-24 object-contain mx-auto"
+              priority
+            />
+            <h1 className="text-2xl font-bold text-gray-900 mt-4">
+              UOB Security House
+            </h1>
+          </div>
+
+          <div className="bg-white py-8 px-6 shadow-soft rounded-xl border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Email Field */}
             <div>
@@ -83,38 +110,38 @@ function LoginPage() {
                 Email address
               </label>
               <div className="mt-1">
-                <input
+          <input 
                   id="email"
                   name="email"
-                  type="email"
+            type="email" 
                   autoComplete="email"
                   required
-                  value={formData.email}
-                  onChange={handleChange}
+            value={formData.email}
+            onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
                   placeholder="Enter your email"
-                />
+          />
               </div>
-            </div>
-
+        </div>
+        
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
               <div className="mt-1">
-                <input
+          <input 
                   id="password"
                   name="password"
-                  type="password"
+            type="password" 
                   autoComplete="current-password"
                   required
-                  value={formData.password}
-                  onChange={handleChange}
+            value={formData.password}
+            onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
                   placeholder="Enter your password"
-                />
-              </div>
+          />
+        </div>
             </div>
 
             {/* Remember Me & Forgot Password */}
@@ -151,9 +178,9 @@ function LoginPage() {
 
             {/* Submit Button */}
             <div>
-              <button
-                type="submit"
-                disabled={loading}
+        <button 
+          type="submit" 
+          disabled={loading}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {loading ? (
@@ -164,7 +191,7 @@ function LoginPage() {
                 ) : (
                   'Sign in'
                 )}
-              </button>
+        </button>
             </div>
           </form>
 
@@ -188,14 +215,6 @@ function LoginPage() {
               </Link>
             </div>
           </div>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials</h3>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Admin:</strong> admin@uobsecurity.com / admin123</p>
-              <p><strong>User:</strong> user@example.com / user123</p>
-            </div>
           </div>
         </div>
       </div>

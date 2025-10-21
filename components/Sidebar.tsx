@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import NavLink from '@/components/NavLink';
 
 interface SidebarProps {
@@ -15,9 +16,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">U</span>
-          </div>
+          <Image
+            src="/UOB_logo.png"
+            alt="UOB Security House"
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded-lg object-contain"
+            priority
+          />
           <div>
             <h1 className="text-lg font-semibold text-gray-900">UOB Security</h1>
             <p className="text-xs text-gray-500">Track Platform</p>

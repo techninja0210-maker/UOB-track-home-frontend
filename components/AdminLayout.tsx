@@ -108,11 +108,11 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
             <div className="flex items-center">
               <Link href="/admin" className="flex items-center space-x-3">
                 <Image
-                  src="/UOB%20Security%20House%20Logo%20Option%203.jpg"
+                  src="/UOB_logo.png"
                   alt="UOB Security House"
                   width={48}
                   height={48}
-                  className="h-12 w-12 rounded-lg object-cover"
+                  className="h-12 w-12 rounded-lg object-contain"
                   priority
                 />
                 <div>

@@ -135,7 +135,7 @@ export default function Dashboard() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
@@ -160,16 +160,16 @@ export default function Dashboard() {
 
   const checkAuthentication = async () => {
     try {
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
+    const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
       const response = await api.get('/api/auth/verify', {
         headers: { Authorization: `Bearer ${token}` }
       });
-
+      
       setUser(response.data.user);
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -233,9 +233,9 @@ export default function Dashboard() {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       if (token) {
-        await api.post('/api/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      await api.post('/api/auth/logout', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -755,11 +755,11 @@ export default function Dashboard() {
             <div className="flex items-center">
               <div className="flex items-center space-x-3">
                 <Image
-                  src="/UOB%20Security%20House%20Logo%20Option%203.jpg"
+                  src="/UOB_logo.png"
                   alt="UOB Security House"
                   width={48}
                   height={48}
-                  className="h-12 w-12 rounded-lg object-cover"
+                  className="h-12 w-12 rounded-lg object-contain"
                   priority
                 />
                 <div>
