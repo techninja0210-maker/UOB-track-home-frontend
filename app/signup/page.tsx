@@ -16,6 +16,9 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('error');
+  const [geoRestrictionError, setGeoRestrictionError] = useState<any>(null);
+  const [locationWarning, setLocationWarning] = useState<any>(null);
+  const [checkingLocation, setCheckingLocation] = useState(false);
   const [fieldValidation, setFieldValidation] = useState({
     fullName: false,
     email: false,
@@ -62,10 +65,38 @@ export default function SignupPage() {
     }));
   };
 
+  const checkUserLocation = async () => {
+    try {
+      setCheckingLocation(true);
+      const response = await fetch('http://localhost:5000/api/auth/check-location', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (!data.success && data.warning) {
+        setLocationWarning(data.warning);
+        return false; // Location check failed
+      }
+      
+      setLocationWarning(null);
+      return true; // Location check passed
+    } catch (error) {
+      console.error('Location check failed:', error);
+      return true; // Allow submission if location check fails
+    } finally {
+      setCheckingLocation(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setLocationWarning(null);
 
     // Validate all fields
     const isFormValid = Object.values(fieldValidation).every(Boolean) && termsAccepted;
@@ -84,6 +115,13 @@ export default function SignupPage() {
       return;
     }
 
+    // Check user location before submission
+    const locationAllowed = await checkUserLocation();
+    if (!locationAllowed) {
+      setLoading(false);
+      return; // Stop submission if location is not allowed
+    }
+
     try {
       const response = await api.post('/api/auth/signup', {
         fullName: formData.fullName,
@@ -99,8 +137,15 @@ export default function SignupPage() {
       }, 2000);
 
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Registration failed. Please try again.');
+      // Handle geographic restriction and VPN detection errors
+      if (error.response?.data?.error === 'GEOGRAPHIC_RESTRICTION' || error.response?.data?.error === 'VPN_DETECTED') {
+        setGeoRestrictionError(error.response.data);
+        setMessage('');
+      } else {
+        setMessage(error.response?.data?.message || 'Registration failed. Please try again.');
       setMessageType('error');
+        setGeoRestrictionError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -132,8 +177,8 @@ export default function SignupPage() {
               className="h-48 w-48 object-contain mx-auto"
               priority
             />
-          </div>
-          
+      </div>
+
           {/* Welcome Text */}
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Join UOB Security House
@@ -323,14 +368,121 @@ export default function SignupPage() {
               </div>
             )}
 
+            {/* Location Warning (shown before submission) */}
+            {locationWarning && (
+              <div className="rounded-lg p-6 bg-yellow-50 border border-yellow-200">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-lg font-medium text-yellow-800">
+                      {locationWarning.title}
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p className="mb-2">{locationWarning.message}</p>
+                      <p className="mb-3">{locationWarning.details}</p>
+                      
+                      <div className="flex items-center space-x-4">
+                        <a 
+                          href={`mailto:${locationWarning.supportEmail}?subject=Registration Access Request&body=Hello, I would like to request access to register on your platform.`}
+                          className="inline-flex items-center px-4 py-2 border border-yellow-300 rounded-md text-sm font-medium text-yellow-700 bg-white hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Contact Support
+                        </a>
+                        
+                        <button
+                          onClick={() => setLocationWarning(null)}
+                          className="text-sm text-yellow-600 hover:text-yellow-500 underline"
+                        >
+                          Continue Anyway
+                        </button>
+                      </div>
+          </div>
+        </div>
+      </div>
+        </div>
+      )}
+
+            {/* Geographic Restriction Error (shown after submission attempt) */}
+            {geoRestrictionError && (
+              <div className="rounded-lg p-6 bg-red-50 border border-red-200">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-lg font-medium text-red-800">
+                      {geoRestrictionError.title}
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p className="mb-2">{geoRestrictionError.message}</p>
+                      <p className="mb-3">{geoRestrictionError.details}</p>
+                      
+                      {geoRestrictionError.location && (
+                        <div className="bg-red-100 rounded-md p-3 mb-3">
+                          <p className="text-sm font-medium text-red-800">Detected Location:</p>
+                          <p className="text-sm text-red-700">
+                            {geoRestrictionError.location.city}, {geoRestrictionError.location.country}
+                          </p>
+                        </div>
+                      )}
+
+                      {geoRestrictionError.vpnInfo && (
+                        <div className="bg-orange-100 rounded-md p-3 mb-3">
+                          <p className="text-sm font-medium text-orange-800">VPN/Proxy Detection:</p>
+                          <p className="text-sm text-orange-700">
+                            {geoRestrictionError.vpnInfo.provider && `Provider: ${geoRestrictionError.vpnInfo.provider}`}
+                            {geoRestrictionError.vpnInfo.confidence && ` (Confidence: ${geoRestrictionError.vpnInfo.confidence}%)`}
+                            {geoRestrictionError.vpnInfo.isUSVPN && ' - US VPN Detected'}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-4">
+                        <a 
+                          href={`mailto:${geoRestrictionError.supportEmail}?subject=Registration Access Request&body=Hello, I would like to request access to register on your platform. My location: ${geoRestrictionError.location?.city}, ${geoRestrictionError.location?.country}`}
+                          className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Contact Support
+                        </a>
+                        
+                        <button
+                          onClick={() => setGeoRestrictionError(null)}
+                          className="text-sm text-red-600 hover:text-red-500 underline"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Submit Button */}
             <div>
               <button
                 type="submit"
-                disabled={loading || !termsAccepted}
+                disabled={loading || checkingLocation || !termsAccepted}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
               >
-                {loading ? (
+                {checkingLocation ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Checking location...
+                  </div>
+                ) : loading ? (
                   <div className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                     Creating account...
