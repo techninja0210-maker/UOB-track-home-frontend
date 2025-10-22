@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatCrypto, formatCompact, formatPercentage } from '@/lib/formatters';
@@ -771,18 +772,18 @@ export default function Dashboard() {
 
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-8">
-              <a href="/" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
+              <Link href="/" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
                 Dashboard
-              </a>
-              <a href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+              </Link>
+              <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 SKRs
-              </a>
-              <a href="/transactions" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+              </Link>
+              <Link href="/transactions" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Transactions
-              </a>
-              <a href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+              </Link>
+              <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Exchange
-              </a>
+              </Link>
             </div>
 
             {/* User Profile */}
@@ -812,12 +813,12 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">{user?.email}</p>
                   </div>
                   <div className="py-1">
-                    <a href="/profile" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       Profile Settings
-                    </a>
-                    <a href="/settings" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    </Link>
+                    <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       Account Settings
-                    </a>
+                    </Link>
                   </div>
                   <div className="border-t border-gray-200 py-1">
                     <button
@@ -836,18 +837,18 @@ export default function Dashboard() {
         {/* Mobile Navigation */}
         <div className="md:hidden border-t border-gray-200 bg-gray-50">
           <div className="px-4 py-2 space-y-1">
-            <a href="/" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
+            <Link href="/" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
               Dashboard
-            </a>
-            <a href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+            </Link>
+            <Link href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               SKRs
-            </a>
-            <a href="/transactions" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+            </Link>
+            <Link href="/transactions" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Transactions
-            </a>
-            <a href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+            </Link>
+            <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Exchange
-            </a>
+            </Link>
           </div>
         </div>
       </nav>
@@ -989,6 +990,140 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Crowdfunding Section */}
+        <div className="mb-8">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Crowdfunding Opportunities</h3>
+                <p className="text-sm text-gray-600 mt-1">Invest in Gold and Oil contracts with guaranteed returns</p>
+              </div>
+              <Link 
+                href="/crowdfunding" 
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                style={{ color: 'white !important' }}
+              >
+                View All
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Sample Gold Contract */}
+              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">🥇</span>
+                    <span className="font-medium text-gray-900">Gold Mining</span>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                    Ongoing
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Target:</span>
+                    <span className="font-medium">$500,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Raised:</span>
+                    <span className="font-medium">$125,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Profit:</span>
+                    <span className="font-medium text-green-600">1%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div className="bg-primary-600 h-2 rounded-full" style={{ width: '25%' }}></div>
+                  </div>
+                  <div className="text-xs text-gray-500">25% funded</div>
+                </div>
+                <Link 
+                  href="/crowdfunding" 
+                  className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                  style={{ color: 'white !important' }}
+                >
+                  Invest Now
+                </Link>
+              </div>
+
+              {/* Sample Oil Contract */}
+              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">🛢️</span>
+                    <span className="font-medium text-gray-900">Oil Exploration</span>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                    Ongoing
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Target:</span>
+                    <span className="font-medium">$1,000,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Raised:</span>
+                    <span className="font-medium">$750,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Profit:</span>
+                    <span className="font-medium text-green-600">1%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div className="bg-primary-600 h-2 rounded-full" style={{ width: '75%' }}></div>
+                  </div>
+                  <div className="text-xs text-gray-500">75% funded</div>
+                </div>
+                <Link 
+                  href="/crowdfunding" 
+                  className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                  style={{ color: 'white !important' }}
+                >
+                  Invest Now
+                </Link>
+              </div>
+
+              {/* Upcoming Contract */}
+              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">🥇</span>
+                    <span className="font-medium text-gray-900">Gold Reserve</span>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    Upcoming
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Target:</span>
+                    <span className="font-medium">$250,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Starts:</span>
+                    <span className="font-medium">Dec 1, 2024</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Profit:</span>
+                    <span className="font-medium text-green-600">1%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div className="bg-gray-300 h-2 rounded-full" style={{ width: '0%' }}></div>
+                  </div>
+                  <div className="text-xs text-gray-500">Starting soon</div>
+                </div>
+                <Link 
+                  href="/crowdfunding" 
+                  className="block w-full mt-3 bg-gray-100 text-gray-600 text-center py-2 rounded-lg cursor-not-allowed text-sm"
+                >
+                  Coming Soon
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* MetaMask Connection */}
           <div className="lg:col-span-1">
@@ -1000,6 +1135,7 @@ export default function Dashboard() {
                   <button
                     onClick={connectMetaMask}
                     className={`w-full ${isConnecting ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'} text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200`}
+                    style={{ color: 'white !important' }}
                     disabled={isConnecting}
                   >
                     {isConnecting ? 'Connecting…' : 'Connect MetaMask'}
@@ -1052,7 +1188,7 @@ export default function Dashboard() {
                           } catch {}
                         }}
                         disabled={!poolAddress}
-                        className="px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 rounded transition-colors"
+                        className="px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-100 disabled:text-gray-400 rounded transition-colors"
                       >
                         Copy
                       </button>
@@ -1230,9 +1366,9 @@ export default function Dashboard() {
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
-                <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                <Link href="/transactions" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
                   View All
-                </button>
+                </Link>
               </div>
               
               <div className="space-y-3">

@@ -25,6 +25,7 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     { href: '/admin/users', label: 'Users' },
     { href: '/admin/transactions', label: 'Transactions' },
     { href: '/admin/skrs', label: 'SKRs' },
+    { href: '/admin/crowdfunding', label: 'Crowdfunding' },
     { href: '/admin/gold-pricing', label: 'Gold Pricing' },
     { href: '/admin/pool-wallets', label: 'Pool Wallets' }
   ];
