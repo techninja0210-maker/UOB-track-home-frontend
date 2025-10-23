@@ -386,7 +386,7 @@ export default function AdminCrowdfundingPage() {
                 setShowCreateModal(true);
               }}
               className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-              style={{ color: 'white !important' }}
+              style={{ color: 'white' }}
             >
               Create Contract
             </button>
@@ -729,14 +729,14 @@ export default function AdminCrowdfundingPage() {
                       setEditingContract(null);
                       resetForm();
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-800 hover:bg-gray-100"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-                    style={{ color: 'white !important' }}
+                    style={{ color: 'white' }}
                   >
                     {editingContract ? 'Update Contract' : 'Create Contract'}
                   </button>

@@ -470,7 +470,7 @@ export default function ContractDetailPage() {
                     onClick={handleInvestment}
                     disabled={!investAmount || investing || parseFloat(investAmount) < 100}
                     className="w-full bg-primary-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    style={{ color: 'white !important' }}
+                    style={{ color: 'white' }}
                   >
                     {investing ? 'Processing...' : 'Invest Now'}
                   </button>

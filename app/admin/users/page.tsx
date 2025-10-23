@@ -266,7 +266,7 @@ export default function AdminUsers() {
                   setRoleFilter('all');
                   setStatusFilter('all');
                 }}
-                className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+                className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200"
               >
                 Clear Filters
               </button>
@@ -415,7 +415,7 @@ export default function AdminUsers() {
                 <button className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200">
                   Edit User
                 </button>
-                <button className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200">
+                <button className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200">
                   Reset Password
                 </button>
               </div>

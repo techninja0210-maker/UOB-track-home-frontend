@@ -137,7 +137,7 @@ export default function LoginHistoryPage() {
             </div>
             <button
               onClick={() => router.back()}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors duration-200"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors duration-200"
             >
               ← Back
             </button>

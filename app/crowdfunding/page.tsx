@@ -190,7 +190,7 @@ export default function CrowdfundingPage() {
               <Link
                 href="/crowdfunding/my-investments"
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-                style={{ color: 'white !important' }}
+                style={{ color: 'white' }}
               >
                 My Investments
               </Link>
@@ -387,10 +387,10 @@ export default function CrowdfundingPage() {
                       contract.status === 'ongoing'
                         ? 'bg-primary-600 text-white hover:bg-primary-700'
                         : contract.status === 'upcoming'
-                        ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-gray-200 text-gray-800 cursor-not-allowed'
+                        : 'bg-gray-200 text-gray-600 cursor-not-allowed'
                     }`}
-                    style={contract.status === 'ongoing' ? { color: 'white !important' } : {}}
+                    style={contract.status === 'ongoing' ? { color: 'white' } : {}}
                   >
                     {contract.status === 'ongoing' ? 'Invest Now' : 
                      contract.status === 'upcoming' ? 'Coming Soon' : 
@@ -409,7 +409,7 @@ export default function CrowdfundingPage() {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-800 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
@@ -423,7 +423,7 @@ export default function CrowdfundingPage() {
                       ? 'bg-primary-600 text-white border-primary-600'
                       : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
                   }`}
-                  style={currentPage === i + 1 ? { color: 'white !important' } : {}}
+                  style={currentPage === i + 1 ? { color: 'white' } : {}}
                 >
                   {i + 1}
                 </button>
@@ -432,7 +432,7 @@ export default function CrowdfundingPage() {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-800 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

@@ -813,12 +813,9 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">{user?.email}</p>
                   </div>
                   <div className="py-1">
-                    <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      Profile Settings
-                    </Link>
-                    <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                      Account Settings
-                    </Link>
+                    <div className="px-4 py-2 text-sm text-gray-500">
+                      User: {user?.role}
+                    </div>
                   </div>
                   <div className="border-t border-gray-200 py-1">
                     <button
@@ -1001,7 +998,7 @@ export default function Dashboard() {
               <Link 
                 href="/crowdfunding" 
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-                style={{ color: 'white !important' }}
+                style={{ color: 'white' }}
               >
                 View All
               </Link>
@@ -1040,7 +1037,7 @@ export default function Dashboard() {
                 <Link 
                   href="/crowdfunding" 
                   className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
-                  style={{ color: 'white !important' }}
+                  style={{ color: 'white' }}
                 >
                   Invest Now
                 </Link>
@@ -1078,7 +1075,7 @@ export default function Dashboard() {
                 <Link 
                   href="/crowdfunding" 
                   className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
-                  style={{ color: 'white !important' }}
+                  style={{ color: 'white' }}
                 >
                   Invest Now
                 </Link>
@@ -1115,7 +1112,7 @@ export default function Dashboard() {
                 </div>
                 <Link 
                   href="/crowdfunding" 
-                  className="block w-full mt-3 bg-gray-100 text-gray-600 text-center py-2 rounded-lg cursor-not-allowed text-sm"
+                  className="block w-full mt-3 bg-gray-200 text-gray-800 text-center py-2 rounded-lg cursor-not-allowed text-sm"
                 >
                   Coming Soon
                 </Link>
@@ -1135,7 +1132,7 @@ export default function Dashboard() {
                   <button
                     onClick={connectMetaMask}
                     className={`w-full ${isConnecting ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary-600 hover:bg-primary-700'} text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200`}
-                    style={{ color: 'white !important' }}
+                    style={{ color: 'white' }}
                     disabled={isConnecting}
                   >
                     {isConnecting ? 'Connecting…' : 'Connect MetaMask'}
@@ -1219,7 +1216,7 @@ export default function Dashboard() {
                       className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                         mmChainId === '0x1' 
                           ? 'bg-primary-100 text-primary-700' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                       }`}
                     >
                       Mainnet
@@ -1229,7 +1226,7 @@ export default function Dashboard() {
                       className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
                         mmChainId === '0xaa36a7' 
                           ? 'bg-primary-100 text-primary-700' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                       }`}
                     >
                       Sepolia
