@@ -1,278 +1,403 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
+import Cookies from 'js-cookie';
+import { getTransactionUrl } from '@/lib/blockchain';
 
-interface Withdrawal {
-  id: string;
-  user_id: string;
-  currency: string;
-  amount: number;
-  destination_address: string;
-  status: string;
-  created_at: string;
-  fee: number;
-  net_amount: number;
-  transaction_hash?: string;
+interface User {
+  id: number;
+  fullName: string;
+  email: string;
+  role: string;
 }
 
-export default function AdminWithdrawals() {
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+interface WithdrawalRequest {
+  id: number;
+  userId: number;
+  currency: string;
+  amount: number;
+  destinationAddress: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed';
+  adminId?: number;
+  adminNotes?: string;
+  transactionHash?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+}
+
+export default function AdminWithdrawalsPage() {
+  const [user, setUser] = useState<User | null>(null);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [selectedWithdrawal, setSelectedWithdrawal] = useState<Withdrawal | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState<WithdrawalRequest | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [transactionHash, setTransactionHash] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const router = useRouter();
 
   useEffect(() => {
+    checkAuthentication();
     loadWithdrawals();
-  }, []);
+    loadStats();
+  }, [selectedStatus]);
+
+  const checkAuthentication = async () => {
+    const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+    
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const response = await api.get('/api/auth/verify', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const userData = response.data.user;
+      
+      if (userData.role !== 'admin') {
+        router.push('/');
+        return;
+      }
+      
+      setUser(userData);
+    } catch (error) {
+      console.error('Authentication error:', error);
+      Cookies.remove('authToken');
+      sessionStorage.removeItem('authToken');
+      router.push('/login');
+    }
+  };
 
   const loadWithdrawals = async () => {
     try {
-      setLoading(true);
-      const response = await api.get('/api/admin/withdrawals');
-      setWithdrawals(response.data || []);
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const params = selectedStatus ? `?status=${selectedStatus}` : '';
+      const response = await api.get(`/api/withdrawals/admin${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setWithdrawals(response.data.data || []);
     } catch (error) {
       console.error('Error loading withdrawals:', error);
-      setWithdrawals([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const loadStats = async () => {
     try {
-      setProcessingId(id);
-      await api.post(`/api/admin/withdrawals/${id}/approve`);
-      await loadWithdrawals();
-      alert('Withdrawal approved successfully!');
-    } catch (error: any) {
-      console.error('Error approving withdrawal:', error);
-      alert(`Failed to approve withdrawal: ${error.response?.data?.message || 'Unknown error'}`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedWithdrawal || !rejectReason.trim()) {
-      alert('Please provide a rejection reason.');
-      return;
-    }
-
-    try {
-      setProcessingId(selectedWithdrawal.id);
-      await api.post(`/api/admin/withdrawals/${selectedWithdrawal.id}/reject`, {
-        reason: rejectReason
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.get('/api/withdrawals/admin/stats', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      await loadWithdrawals();
-      setShowRejectModal(false);
-      setSelectedWithdrawal(null);
-      setRejectReason('');
-      alert('Withdrawal rejected successfully!');
-    } catch (error: any) {
-      console.error('Error rejecting withdrawal:', error);
-      alert(`Failed to reject withdrawal: ${error.response?.data?.message || 'Unknown error'}`);
-    } finally {
-      setProcessingId(null);
+      setStats(response.data.data);
+    } catch (error) {
+      console.error('Error loading stats:', error);
     }
   };
 
-  const openRejectModal = (withdrawal: Withdrawal) => {
+  const handleApprove = async (withdrawal: WithdrawalRequest) => {
     setSelectedWithdrawal(withdrawal);
-    setShowRejectModal(true);
+    setAdminNotes('');
+    setShowModal(true);
+  };
+
+  const handleReject = async (withdrawal: WithdrawalRequest) => {
+    setSelectedWithdrawal(withdrawal);
+    setAdminNotes('');
+    setShowModal(true);
+  };
+
+  const handleComplete = async (withdrawal: WithdrawalRequest) => {
+    setSelectedWithdrawal(withdrawal);
+    setTransactionHash('');
+    setAdminNotes('');
+    setShowModal(true);
+  };
+
+  const submitAction = async (action: 'approve' | 'reject' | 'complete') => {
+    if (!selectedWithdrawal) return;
+
+    setActionLoading(true);
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      
+      if (action === 'complete') {
+        await api.post(`/api/withdrawals/admin/${selectedWithdrawal.id}/complete`, {
+          transactionHash: transactionHash
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await api.post(`/api/withdrawals/admin/${selectedWithdrawal.id}/${action}`, {
+          adminNotes: adminNotes
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+
+      setShowModal(false);
+      setSelectedWithdrawal(null);
+      setAdminNotes('');
+      setTransactionHash('');
+      loadWithdrawals();
+      loadStats();
+    } catch (error) {
+      console.error(`Error ${action}ing withdrawal:`, error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'success';
+      case 'approved': return 'success';
+      case 'rejected': return 'error';
+      case 'failed': return 'error';
+      case 'pending': return 'warning';
+      default: return 'neutral';
+    }
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
 
-  const formatAmount = (amount: number, currency: string) => {
-    return `${amount.toFixed(8)} ${currency}`;
+  const truncateAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      pending: { bg: '#FFA500', color: 'white', text: 'Pending' },
-      approved: { bg: '#4CAF50', color: 'white', text: 'Approved' },
-      rejected: { bg: '#f44336', color: 'white', text: 'Rejected' },
-      completed: { bg: '#2196F3', color: 'white', text: 'Completed' },
-      failed: { bg: '#666', color: 'white', text: 'Failed' }
-    };
-    
-    const style = statusStyles[status as keyof typeof statusStyles] || statusStyles.pending;
-    
+  if (!user) {
     return (
-      <span 
-        className="status-badge"
-        style={{ backgroundColor: style.bg, color: style.color }}
-      >
-        {style.text}
-      </span>
+      <div className="admin-loading">
+        <div className="loading-spinner"></div>
+      </div>
     );
-  };
-
-  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
-  const completedWithdrawals = withdrawals.filter(w => w.status === 'completed');
+  }
 
   return (
-    <AdminLayout title="Withdrawal Management" subtitle="Review and approve withdrawal requests">
-      <div className="withdrawals-management">
+    <AdminLayout title="Withdrawal Management" subtitle="Manage user withdrawal requests">
+      <div className="admin-withdrawals">
         {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">💸</div>
-            <div className="stat-content">
-              <h3>Pending Withdrawals</h3>
-              <p>{pendingWithdrawals.length}</p>
-            </div>
+        {stats && (
+          <div className="stats-grid">
+            {stats.map((stat: any) => (
+              <div key={stat.status} className="stat-card">
+                <div className="stat-value">{stat.count}</div>
+                <div className="stat-label">{stat.status.toUpperCase()}</div>
+                <div className="stat-amount">
+                  {stat.total_amount ? `${stat.total_amount} ${stat.currency || ''}` : '-'}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>Completed Today</h3>
-              <p>{completedWithdrawals.length}</p>
-            </div>
+        )}
+
+        {/* Filters */}
+        <div className="filters-section">
+          <div className="filter-group">
+            <label>Filter by Status:</label>
+            <select 
+              value={selectedStatus} 
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <h3>Total Value</h3>
-              <p>${withdrawals.reduce((sum, w) => sum + (w.amount || 0), 0).toFixed(2)}</p>
-            </div>
-          </div>
+          <button 
+            className="btn-refresh"
+            onClick={() => {
+              loadWithdrawals();
+              loadStats();
+            }}
+          >
+            🔄 Refresh
+          </button>
         </div>
 
         {/* Withdrawals Table */}
         <div className="withdrawals-table-container">
-          {loading ? (
-            <div className="loading-state">
-              <div className="loading-spinner"></div>
-              <p>Loading withdrawal requests...</p>
-            </div>
-          ) : (
-            <div className="withdrawals-table">
-              <div className="table-header">
-                <div className="table-cell">User</div>
-                <div className="table-cell">Currency</div>
-                <div className="table-cell">Amount</div>
-                <div className="table-cell">Fee</div>
-                <div className="table-cell">Net Amount</div>
-                <div className="table-cell">Destination</div>
-                <div className="table-cell">Status</div>
-                <div className="table-cell">Date</div>
-                <div className="table-cell">Actions</div>
-              </div>
-              
-              {withdrawals.length > 0 ? (
-                withdrawals.map((withdrawal) => (
-                  <div key={withdrawal.id} className="table-row">
-                    <div className="table-cell">
-                      <span className="user-id">User #{withdrawal.user_id ? withdrawal.user_id.substring(0, 8) : 'N/A'}</span>
-                    </div>
-                    <div className="table-cell">
-                      <span className="currency-badge">{withdrawal.currency}</span>
-                    </div>
-                        <div className="table-cell">
-                          <span className="amount-text">{formatAmount(withdrawal.amount || 0, withdrawal.currency || 'USD')}</span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="fee-text">{formatAmount(withdrawal.fee || 0, withdrawal.currency || 'USD')}</span>
-                        </div>
-                        <div className="table-cell">
-                          <span className="net-amount-text">{formatAmount(withdrawal.net_amount || 0, withdrawal.currency || 'USD')}</span>
-                        </div>
-                    <div className="table-cell">
-                      <span className="address-text">
-                        {withdrawal.destination_address ? withdrawal.destination_address.substring(0, 12) + '...' : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="table-cell">
-                      {getStatusBadge(withdrawal.status)}
-                    </div>
-                    <div className="table-cell">
-                      <span className="date-text">{formatDate(withdrawal.created_at)}</span>
-                    </div>
-                    <div className="table-cell">
-                      {withdrawal.status === 'pending' && (
-                        <div className="action-buttons">
-                          <button 
-                            className="action-btn approve-btn"
-                            onClick={() => handleApprove(withdrawal.id)}
-                            disabled={processingId === withdrawal.id}
-                          >
-                            {processingId === withdrawal.id ? 'Processing...' : 'Approve'}
-                          </button>
-                          <button 
-                            className="action-btn reject-btn"
-                            onClick={() => openRejectModal(withdrawal)}
-                            disabled={processingId === withdrawal.id}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                      {withdrawal.status === 'completed' && withdrawal.transaction_hash && (
-                        <div className="transaction-info">
-                          <span className="tx-hash">
-                            {withdrawal.transaction_hash.substring(0, 10)}...
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
+          <table className="withdrawals-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Currency</th>
+                <th>Amount</th>
+                <th>Destination</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="text-center">
+                    <div className="loading-spinner"></div>
+                  </td>
+                </tr>
+              ) : withdrawals.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center">
+                    No withdrawal requests found
+                  </td>
+                </tr>
               ) : (
-                <div className="no-withdrawals">
-                  <div className="no-withdrawals-icon">💸</div>
-                  <h3>No withdrawal requests</h3>
-                  <p>No withdrawal requests found</p>
-                </div>
+                withdrawals.map((withdrawal) => (
+                  <tr key={withdrawal.id}>
+                    <td>#{withdrawal.id}</td>
+                    <td>
+                      <div className="user-info">
+                        <div className="user-name">{withdrawal.fullName}</div>
+                        <div className="user-email">{withdrawal.email}</div>
+                      </div>
+                    </td>
+                    <td>{withdrawal.currency}</td>
+                    <td>{withdrawal.amount}</td>
+                    <td className="truncate" title={withdrawal.destinationAddress}>
+                      {truncateAddress(withdrawal.destinationAddress)}
+                    </td>
+                    <td>
+                      <span className={`status-pill ${getStatusColor(withdrawal.status)}`}>
+                        {withdrawal.status}
+                      </span>
+                    </td>
+                    <td>{formatDate(withdrawal.createdAt)}</td>
+                    <td>
+                      <div className="action-buttons">
+                        {withdrawal.status === 'pending' && (
+                          <>
+                            <button 
+                              className="btn-approve"
+                              onClick={() => handleApprove(withdrawal)}
+                            >
+                              ✓ Approve
+                            </button>
+                            <button 
+                              className="btn-reject"
+                              onClick={() => handleReject(withdrawal)}
+                            >
+                              ✗ Reject
+                            </button>
+                          </>
+                        )}
+                        {withdrawal.status === 'approved' && (
+                          <button 
+                            className="btn-complete"
+                            onClick={() => handleComplete(withdrawal)}
+                          >
+                            ✓ Complete
+                          </button>
+                        )}
+                        {withdrawal.transactionHash && (
+                          <a 
+                            href={getTransactionUrl(withdrawal.transactionHash)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-view-tx"
+                          >
+                            🔗 View TX
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Reject Modal */}
-        {showRejectModal && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">Reject Withdrawal</h3>
-              <p className="modal-subtitle">
-                Reject withdrawal request for User #{selectedWithdrawal?.user_id?.substring(0, 8)}
-              </p>
-              
-              <div className="form-group">
-                <label className="form-label">Rejection Reason</label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  className="form-textarea"
-                  placeholder="Please provide a reason for rejecting this withdrawal..."
-                  rows={4}
-                />
+        {/* Action Modal */}
+        {showModal && selectedWithdrawal && (
+          <div className="modal-overlay" onClick={() => setShowModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>
+                  {selectedWithdrawal.status === 'pending' ? 'Approve/Reject' : 'Complete'} 
+                  Withdrawal #{selectedWithdrawal.id}
+                </h2>
+                <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
               </div>
-              
-              <div className="modal-actions">
-                <button 
-                  className="action-btn cancel-btn"
-                  onClick={() => {
-                    setShowRejectModal(false);
-                    setSelectedWithdrawal(null);
-                    setRejectReason('');
-                  }}
-                >
-                  Cancel
-                </button>
-                <button 
-                  className="action-btn confirm-reject-btn"
-                  onClick={handleReject}
-                  disabled={!rejectReason.trim() || processingId === selectedWithdrawal?.id}
-                >
-                  {processingId === selectedWithdrawal?.id ? 'Processing...' : 'Confirm Rejection'}
-                </button>
+              <div className="modal-body">
+                <div className="withdrawal-details">
+                  <p><strong>User:</strong> {selectedWithdrawal.fullName} ({selectedWithdrawal.email})</p>
+                  <p><strong>Amount:</strong> {selectedWithdrawal.amount} {selectedWithdrawal.currency}</p>
+                  <p><strong>Destination:</strong> {selectedWithdrawal.destinationAddress}</p>
+                </div>
+
+                <div className="form-group">
+                  <label>Admin Notes:</label>
+                  <textarea 
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    placeholder="Add notes about this action..."
+                    className="form-textarea"
+                    rows={3}
+                  />
+                </div>
+
+                {selectedWithdrawal.status === 'approved' && (
+                  <div className="form-group">
+                    <label>Transaction Hash:</label>
+                    <input 
+                      type="text"
+                      value={transactionHash}
+                      onChange={(e) => setTransactionHash(e.target.value)}
+                      placeholder="Enter blockchain transaction hash"
+                      className="form-input"
+                    />
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  {selectedWithdrawal.status === 'pending' && (
+                    <>
+                      <button 
+                        className="btn-approve"
+                        onClick={() => submitAction('approve')}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? 'Processing...' : '✓ Approve'}
+                      </button>
+                      <button 
+                        className="btn-reject"
+                        onClick={() => submitAction('reject')}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? 'Processing...' : '✗ Reject'}
+                      </button>
+                    </>
+                  )}
+                  {selectedWithdrawal.status === 'approved' && (
+                    <button 
+                      className="btn-complete"
+                      onClick={() => submitAction('complete')}
+                      disabled={actionLoading || !transactionHash}
+                    >
+                      {actionLoading ? 'Processing...' : '✓ Complete Transaction'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -280,249 +405,188 @@ export default function AdminWithdrawals() {
       </div>
 
       <style jsx>{`
-        .withdrawals-management {
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
+        .admin-withdrawals {
+          padding: 20px;
         }
 
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
+          gap: 20px;
+          margin-bottom: 30px;
         }
 
         .stat-card {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 1.5rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          text-align: center;
         }
 
-        .stat-icon {
-          width: 50px;
-          height: 50px;
-          background: linear-gradient(135deg, #FFD700, #FFA500);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          color: #1A1A1A;
+        .stat-value {
+          font-size: 2rem;
+          font-weight: bold;
+          color: #2563eb;
         }
 
-        .stat-content h3 {
-          font-size: 0.9rem;
-          color: #CCCCCC;
-          margin: 0 0 0.5rem 0;
+        .stat-label {
+          color: #6b7280;
+          margin: 5px 0;
+        }
+
+        .stat-amount {
+          color: #059669;
           font-weight: 500;
         }
 
-        .stat-content p {
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #FFD700;
-          margin: 0;
+        .filters-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          padding: 15px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filter-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .filter-select {
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+        }
+
+        .btn-refresh {
+          padding: 8px 16px;
+          background: #2563eb;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
         }
 
         .withdrawals-table-container {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           overflow: hidden;
         }
 
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-        }
-
-        .loading-spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #333;
-          border-top: 3px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 1rem;
-        }
-
         .withdrawals-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .withdrawals-table th,
+        .withdrawals-table td {
+          padding: 12px;
+          text-align: left;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .withdrawals-table th {
+          background: #f9fafb;
+          font-weight: 600;
+        }
+
+        .user-info {
           display: flex;
           flex-direction: column;
         }
 
-        .table-header {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1fr 1.5fr 1.5fr;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          background: #1A1A1A;
-          border-bottom: 1px solid #333;
-          font-weight: 600;
-          color: #FFD700;
-        }
-
-        .table-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1fr 1.5fr 1.5fr;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #333;
-          align-items: center;
-          transition: background 0.3s ease;
-        }
-
-        .table-row:hover {
-          background: rgba(255, 215, 0, 0.05);
-        }
-
-        .table-row:last-child {
-          border-bottom: none;
-        }
-
-        .table-cell {
-          display: flex;
-          align-items: center;
-        }
-
-        .user-id {
-          color: #CCCCCC;
-          font-family: monospace;
-          font-size: 0.9rem;
-        }
-
-        .currency-badge {
-          background: #333;
-          color: #FFD700;
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-
-        .amount-text {
-          color: white;
+        .user-name {
           font-weight: 500;
         }
 
-        .fee-text {
-          color: #FFA500;
-          font-weight: 500;
+        .user-email {
+          font-size: 0.875rem;
+          color: #6b7280;
         }
 
-        .net-amount-text {
-          color: #4CAF50;
-          font-weight: 600;
-        }
-
-        .address-text {
-          color: #4CAF50;
-          font-family: monospace;
-          font-size: 0.85rem;
-        }
-
-        .status-badge {
-          padding: 0.25rem 0.75rem;
+        .status-pill {
+          padding: 4px 8px;
           border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
+          font-size: 0.75rem;
+          font-weight: 500;
           text-transform: uppercase;
         }
 
-        .date-text {
-          color: #CCCCCC;
-          font-size: 0.9rem;
+        .status-pill.success {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .status-pill.error {
+          background: #fef2f2;
+          color: #dc2626;
+        }
+
+        .status-pill.warning {
+          background: #fef3c7;
+          color: #d97706;
+        }
+
+        .status-pill.neutral {
+          background: #f3f4f6;
+          color: #6b7280;
         }
 
         .action-buttons {
           display: flex;
-          gap: 0.5rem;
+          gap: 5px;
+          flex-wrap: wrap;
         }
 
-        .action-btn {
-          padding: 0.5rem 1rem;
+        .btn-approve, .btn-complete {
+          padding: 4px 8px;
+          background: #059669;
+          color: white;
           border: none;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          font-weight: 500;
+          border-radius: 4px;
+          font-size: 0.75rem;
           cursor: pointer;
-          transition: all 0.3s ease;
         }
 
-        .action-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .approve-btn {
-          background: #4CAF50;
+        .btn-reject {
+          padding: 4px 8px;
+          background: #dc2626;
           color: white;
+          border: none;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          cursor: pointer;
         }
 
-        .approve-btn:hover:not(:disabled) {
-          background: #45a049;
-        }
-
-        .reject-btn {
-          background: #f44336;
+        .btn-view-tx {
+          padding: 4px 8px;
+          background: #2563eb;
           color: white;
+          text-decoration: none;
+          border-radius: 4px;
+          font-size: 0.75rem;
         }
 
-        .reject-btn:hover:not(:disabled) {
-          background: #da190b;
+        .truncate {
+          max-width: 150px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
-        .transaction-info {
-          display: flex;
-          align-items: center;
-        }
-
-        .tx-hash {
-          color: #4CAF50;
-          font-family: monospace;
-          font-size: 0.85rem;
-        }
-
-        .no-withdrawals {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #CCCCCC;
-          text-align: center;
-        }
-
-        .no-withdrawals-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .no-withdrawals h3 {
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .no-withdrawals p {
-          margin: 0;
-        }
-
-        /* Modal Styles */
         .modal-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(0,0,0,0.5);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -530,116 +594,99 @@ export default function AdminWithdrawals() {
         }
 
         .modal-content {
-          background: linear-gradient(135deg, #2C2C2C, #1A1A1A);
-          border: 1px solid #333;
-          border-radius: 12px;
-          padding: 2rem;
+          background: white;
+          border-radius: 8px;
           max-width: 500px;
           width: 90%;
-          max-height: 80vh;
+          max-height: 90vh;
           overflow-y: auto;
         }
 
-        .modal-title {
-          color: #FFD700;
-          margin: 0 0 0.5rem 0;
-          font-size: 1.5rem;
-          font-weight: 600;
+        .modal-header {
+          padding: 20px;
+          border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
-        .modal-subtitle {
-          color: #CCCCCC;
-          margin: 0 0 2rem 0;
-          font-size: 1rem;
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 1.5rem;
+          cursor: pointer;
+        }
+
+        .modal-body {
+          padding: 20px;
+        }
+
+        .withdrawal-details {
+          background: #f9fafb;
+          padding: 15px;
+          border-radius: 4px;
+          margin-bottom: 20px;
         }
 
         .form-group {
-          margin-bottom: 1.5rem;
+          margin-bottom: 15px;
         }
 
-        .form-label {
+        .form-group label {
           display: block;
-          color: #CCCCCC;
+          margin-bottom: 5px;
           font-weight: 500;
-          margin-bottom: 0.5rem;
+        }
+
+        .form-textarea, .form-input {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          font-family: inherit;
         }
 
         .form-textarea {
-          width: 100%;
-          padding: 0.75rem 1rem;
-          background: #1A1A1A;
-          border: 1px solid #444;
-          border-radius: 8px;
-          color: white;
-          font-size: 1rem;
           resize: vertical;
-          min-height: 100px;
-        }
-
-        .form-textarea:focus {
-          outline: none;
-          border-color: #FFD700;
         }
 
         .modal-actions {
           display: flex;
-          gap: 1rem;
+          gap: 10px;
           justify-content: flex-end;
+          margin-top: 20px;
         }
 
-        .cancel-btn {
-          background: #666;
-          color: white;
+        .modal-actions button {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
         }
 
-        .cancel-btn:hover {
-          background: #777;
+        .modal-actions button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
-        .confirm-reject-btn {
-          background: #f44336;
-          color: white;
+        .text-center {
+          text-align: center;
         }
 
-        .confirm-reject-btn:hover:not(:disabled) {
-          background: #da190b;
+        .loading-spinner {
+          width: 20px;
+          height: 20px;
+          border: 2px solid #f3f3f3;
+          border-top: 2px solid #2563eb;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
         }
 
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .table-header,
-          .table-row {
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-          }
-          
-          .table-cell {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.25rem;
-          }
-          
-          .action-buttons {
-            flex-direction: column;
-          }
-          
-          .modal-content {
-            margin: 1rem;
-            width: calc(100% - 2rem);
-          }
-          
-          .modal-actions {
-            flex-direction: column;
-          }
         }
       `}</style>
     </AdminLayout>

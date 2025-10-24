@@ -43,10 +43,10 @@ export default function AdminPoolWallets() {
       setLoading(true);
       const [walletsRes, requestsRes] = await Promise.all([
         api.get('/api/admin/pool-wallets'),
-        api.get('/api/admin/withdrawal-requests'),
+        api.get('/api/withdrawals/admin'),
       ]);
       setPoolWallets(walletsRes.data || []);
-      setWithdrawalRequests(requestsRes.data || []);
+      setWithdrawalRequests(requestsRes.data.data || []);
     } catch (error) {
       console.error('Error loading pool data:', error);
       notificationSocket.notifyLocal({

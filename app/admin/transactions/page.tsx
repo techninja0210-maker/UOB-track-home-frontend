@@ -78,8 +78,8 @@ export default function AdminTransactions() {
 
   const loadWithdrawals = async () => {
     try {
-      const response = await api.get('/api/admin/withdrawals');
-      setWithdrawals(response.data || []);
+      const response = await api.get('/api/withdrawals/admin');
+      setWithdrawals(response.data.data || []);
     } catch (error) {
       console.error('Error loading withdrawals:', error);
       setWithdrawals([]);

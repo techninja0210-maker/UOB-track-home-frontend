@@ -621,7 +621,7 @@ export default function TransactionsPage() {
                         </button>
                         {transaction.transactionHash && (
                           <a
-                            href={`https://etherscan.io/tx/${transaction.transactionHash}`}
+                            href={`https://sepolia.etherscan.io/tx/${transaction.transactionHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900 text-left text-xs"

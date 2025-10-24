@@ -840,6 +840,9 @@ export default function Dashboard() {
               <Link href="/" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
                 Dashboard
               </Link>
+              <Link href="/wallet" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                Wallet
+              </Link>
               <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 SKRs
               </Link>
@@ -901,6 +904,9 @@ export default function Dashboard() {
           <div className="px-4 py-2 space-y-1">
             <Link href="/" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
               Dashboard
+            </Link>
+            <Link href="/wallet" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              Wallet
             </Link>
             <Link href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               SKRs
