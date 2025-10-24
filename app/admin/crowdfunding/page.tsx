@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
+import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
 interface Contract {
@@ -73,28 +74,10 @@ export default function AdminCrowdfundingPage() {
       // Check if we're on the client side
       if (typeof window === 'undefined') return;
       
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      // Check if user is admin
-      const response = await fetch('http://localhost:5000/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        localStorage.removeItem('authToken');
-        router.push('/login');
-        return;
-      }
-
-      const userData = await response.json();
-      if (userData.role !== 'admin') {
+      // Use API client for authentication check
+      const response = await api.get('/api/auth/me');
+      
+      if (response.data && response.data.role !== 'admin') {
         alert('Admin access required');
         router.push('/');
         return;
@@ -104,7 +87,6 @@ export default function AdminCrowdfundingPage() {
       loadData();
     } catch (error) {
       console.error('Auth check error:', error);
-      localStorage.removeItem('authToken');
       router.push('/login');
     }
   };
