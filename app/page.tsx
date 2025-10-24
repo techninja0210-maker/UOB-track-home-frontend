@@ -147,6 +147,28 @@ export default function Dashboard() {
     }
   }, [depositCurrency, mmConnected]);
 
+  // Check for existing MetaMask connection on mount (but don't auto-connect)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      // Only check if already connected, don't auto-connect
+      (window as any).ethereum.request({ method: 'eth_accounts' })
+        .then((accounts: string[]) => {
+          if (accounts.length > 0) {
+            setMmAddress(accounts[0]);
+            setupMetaMaskConnection(accounts[0]);
+          }
+        })
+        .catch((error: unknown) => {
+          // Silently handle MetaMask not available
+          if (error && typeof error === 'object' && 'message' in error && 
+              typeof error.message === 'string' && 
+              error.message.includes('MetaMask extension not found')) {
+            console.log('MetaMask extension not found - this is expected if not installed');
+          }
+        });
+    }
+  }, []);
+
   // Load user balances, transactions, and crypto prices when component mounts
   useEffect(() => {
     if (user?.id) {
@@ -279,6 +301,18 @@ export default function Dashboard() {
       }
     } catch (error: any) {
       console.error('MetaMask connection error:', error);
+      
+      // Handle specific MetaMask errors gracefully
+      if (error.message && error.message.includes('MetaMask extension not found')) {
+        notificationSocket.notifyLocal({
+          type: 'warning',
+          title: 'MetaMask not found',
+          message: 'Please install MetaMask extension to connect your wallet.',
+        });
+        setIsConnecting(false);
+        return;
+      }
+      
       let msg = typeof error?.message === 'string' ? error.message : 'Failed to connect to MetaMask';
       // Common MetaMask codes
       if (typeof error?.code === 'number') {
@@ -300,7 +334,10 @@ export default function Dashboard() {
   };
 
   const setupMetaMaskConnection = async (addressOverride?: string) => {
-    if (typeof window === 'undefined' || !(window as any).ethereum) return;
+    if (typeof window === 'undefined' || !(window as any).ethereum) {
+      console.log('MetaMask not available - skipping connection setup');
+      return;
+    }
 
     try {
       // Get network info
@@ -338,8 +375,15 @@ export default function Dashboard() {
       provider.on('accountsChanged', handleAccountsChanged);
       provider.on('chainChanged', handleChainChanged);
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Setup MetaMask connection error:', error);
+      // Don't show error notifications for automatic connection attempts
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && 
+          error.message.includes('MetaMask extension not found')) {
+        console.log('MetaMask extension not found - this is expected if not installed');
+        return;
+      }
     }
   };
 
