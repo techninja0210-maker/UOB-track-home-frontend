@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
+import api from '@/lib/api';
 
 interface Contract {
   id: string;
@@ -78,20 +79,12 @@ export default function CrowdfundingPage() {
         params.append('contract_type', selectedType);
       }
 
-      const response = await fetch(`http://localhost:5000/api/crowdfunding/contracts?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/api/crowdfunding/contracts?${params}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch contracts');
+      if (response.data) {
+        setContracts(response.data.data || []);
+        setTotalPages(response.data.pagination?.totalPages || 1);
       }
-
-      const data = await response.json();
-      setContracts(data.data || []);
-      setTotalPages(data.pagination?.totalPages || 1);
     } catch (error) {
       console.error('Error loading contracts:', error);
       setContracts([]);

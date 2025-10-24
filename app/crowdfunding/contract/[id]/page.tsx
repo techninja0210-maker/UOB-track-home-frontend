@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
+import api from '@/lib/api';
 
 interface Contract {
   id: string;
@@ -80,32 +81,16 @@ export default function ContractDetailPage() {
       
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       
-      const response = await fetch(`http://localhost:5000/api/crowdfunding/contracts/${contractId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/api/crowdfunding/contracts/${contractId}`);
       
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem('authToken');
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to fetch contract details');
-      }
-
-      const data = await response.json();
-      console.log('Contract API response:', data);
-      if (data.success && data.data) {
-        console.log('Contract data:', data.data.contract);
-        setContract(data.data.contract);
+      if (response.data && response.data.success && response.data.data) {
+        console.log('Contract data:', response.data.data.contract);
+        setContract(response.data.data.contract);
         // Set empty arrays for investments and updates if not provided
-        setInvestments(data.data.recent_investments || []);
-        setUpdates(data.data.updates || []);
+        setInvestments(response.data.data.recent_investments || []);
+        setUpdates(response.data.data.updates || []);
       } else {
-        throw new Error(data.message || 'Failed to load contract');
+        throw new Error(response.data?.message || 'Failed to load contract');
       }
     } catch (error) {
       console.error('Error loading contract details:', error);
@@ -145,26 +130,17 @@ export default function ContractDetailPage() {
       
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       
-      const response = await fetch('http://localhost:5000/api/crowdfunding/invest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          contract_id: contractId,
-          amount: amount
-        })
+      const response = await api.post('/api/crowdfunding/invest', {
+        contract_id: contractId,
+        amount: amount
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data && response.data.success) {
         alert('Investment successful! Your funds have been invested in the contract.');
         setInvestAmount('');
         loadContractDetails(); // Refresh contract details
       } else {
-        alert(data.message || 'Failed to submit investment');
+        alert(response.data?.message || 'Failed to submit investment');
       }
     } catch (error) {
       console.error('Investment error:', error);

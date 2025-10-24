@@ -68,17 +68,10 @@ export default function SignupPage() {
   const checkUserLocation = async () => {
     try {
       setCheckingLocation(true);
-      const response = await fetch('http://localhost:5000/api/auth/check-location', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await api.post('/api/auth/check-location', { ip: userIP });
 
-      const data = await response.json();
-      
-      if (!data.success && data.warning) {
-        setLocationWarning(data.warning);
+      if (response.data && !response.data.success && response.data.warning) {
+        setLocationWarning(response.data.warning);
         return false; // Location check failed
       }
       

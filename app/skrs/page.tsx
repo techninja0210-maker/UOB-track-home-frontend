@@ -158,22 +158,22 @@ export default function SKRsPage() {
     try {
       console.log('Downloading SKR PDF for ID:', skrId);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/exports/skrs/${skrId}/pdf`, {
+      const response = await api.get(`/api/exports/skrs/${skrId}/pdf`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.ok) {
-        const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      if (response.data) {
+        // Create blob from response data
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `skr_${skrId}_${Date.now()}.pdf`;
         a.click();
-      window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(url);
       } else {
-        const errorData = await response.json();
-        console.error('Failed to download individual SKR PDF:', response.status, errorData);
-        alert(`Failed to download PDF: ${errorData.message || 'Unknown error'}`);
+        console.error('Failed to download individual SKR PDF:', response.status, response.data);
+        alert(`Failed to download PDF: ${response.data?.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error downloading individual SKR PDF:', error);

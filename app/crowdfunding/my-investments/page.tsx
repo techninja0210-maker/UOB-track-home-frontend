@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
+import api from '@/lib/api';
 
 interface Investment {
   id: string;
@@ -51,19 +52,11 @@ export default function MyInvestmentsPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/crowdfunding/my-investments', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get('/api/crowdfunding/my-investments');
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch investments');
+      if (response.data) {
+        setInvestments(response.data.data || []);
       }
-
-      const data = await response.json();
-      setInvestments(data.data);
     } catch (error) {
       console.error('Error loading investments:', error);
     } finally {

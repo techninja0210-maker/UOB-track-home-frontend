@@ -94,35 +94,17 @@ export default function AdminCrowdfundingPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Check if we're on the client side
-      if (typeof window === 'undefined') return;
-      
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       
       // Load contracts
-      const contractsResponse = await fetch('http://localhost:5000/api/crowdfunding/contracts?limit=100', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (contractsResponse.ok) {
-        const contractsData = await contractsResponse.json();
-        setContracts(contractsData.data);
+      const contractsResponse = await api.get('/api/crowdfunding/contracts?limit=100');
+      if (contractsResponse.data && contractsResponse.data.data) {
+        setContracts(contractsResponse.data.data);
       }
 
       // Load investments
-      const investmentsResponse = await fetch('http://localhost:5000/api/crowdfunding/admin/investments', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (investmentsResponse.ok) {
-        const investmentsData = await investmentsResponse.json();
-        setInvestments(investmentsData.data);
+      const investmentsResponse = await api.get('/api/crowdfunding/admin/investments');
+      if (investmentsResponse.data && investmentsResponse.data.data) {
+        setInvestments(investmentsResponse.data.data);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -134,42 +116,22 @@ export default function AdminCrowdfundingPage() {
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Check if we're on the client side
-      if (typeof window === 'undefined') return;
-      
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      const response = await fetch('http://localhost:5000/api/crowdfunding/contracts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          target_amount: parseFloat(formData.target_amount),
-          minimum_investment: parseFloat(formData.minimum_investment),
-          maximum_investment: formData.maximum_investment ? parseFloat(formData.maximum_investment) : null,
-          profit_percentage: parseFloat(formData.profit_percentage),
-          contract_duration_months: parseInt(formData.contract_duration_months)
-        })
+      const response = await api.post('/api/crowdfunding/contracts', {
+        ...formData,
+        target_amount: parseFloat(formData.target_amount),
+        minimum_investment: parseFloat(formData.minimum_investment),
+        maximum_investment: formData.maximum_investment ? parseFloat(formData.maximum_investment) : null,
+        profit_percentage: parseFloat(formData.profit_percentage),
+        contract_duration_months: parseInt(formData.contract_duration_months)
       });
-
-      const data = await response.json();
       
-      if (data.success) {
+      if (response.data && response.data.success) {
         setShowCreateModal(false);
         resetForm();
         loadData();
         alert('Contract created successfully!');
       } else {
-        if (response.status === 401 || response.status === 403) {
-          alert('Authentication error. Please login as admin.');
-          localStorage.removeItem('authToken');
-          router.push('/login');
-        } else {
-          alert(data.message || 'Failed to create contract');
-        }
+        alert(response.data?.message || 'Failed to create contract');
       }
     } catch (error) {
       console.error('Create contract error:', error);
@@ -182,36 +144,22 @@ export default function AdminCrowdfundingPage() {
     if (!editingContract) return;
     
     try {
-      // Check if we're on the client side
-      if (typeof window === 'undefined') return;
-      
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      const response = await fetch(`http://localhost:5000/api/crowdfunding/contracts/${editingContract.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          target_amount: parseFloat(formData.target_amount),
-          minimum_investment: parseFloat(formData.minimum_investment),
-          maximum_investment: formData.maximum_investment ? parseFloat(formData.maximum_investment) : null,
-          profit_percentage: parseFloat(formData.profit_percentage),
-          contract_duration_months: parseInt(formData.contract_duration_months)
-        })
+      const response = await api.put(`/api/crowdfunding/contracts/${editingContract.id}`, {
+        ...formData,
+        target_amount: parseFloat(formData.target_amount),
+        minimum_investment: parseFloat(formData.minimum_investment),
+        maximum_investment: formData.maximum_investment ? parseFloat(formData.maximum_investment) : null,
+        profit_percentage: parseFloat(formData.profit_percentage),
+        contract_duration_months: parseInt(formData.contract_duration_months)
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data && response.data.success) {
         setEditingContract(null);
         resetForm();
         loadData();
         alert('Contract updated successfully!');
       } else {
-        alert(data.message || 'Failed to update contract');
+        alert(response.data?.message || 'Failed to update contract');
       }
     } catch (error) {
       console.error('Update contract error:', error);
@@ -223,25 +171,13 @@ export default function AdminCrowdfundingPage() {
     if (!confirm('Are you sure you want to delete this contract?')) return;
     
     try {
-      // Check if we're on the client side
-      if (typeof window === 'undefined') return;
+      const response = await api.delete(`/api/crowdfunding/contracts/${contractId}`);
       
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      const response = await fetch(`http://localhost:5000/api/crowdfunding/contracts/${contractId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data && response.data.success) {
         loadData();
         alert('Contract deleted successfully!');
       } else {
-        alert(data.message || 'Failed to delete contract');
+        alert(response.data?.message || 'Failed to delete contract');
       }
     } catch (error) {
       console.error('Delete contract error:', error);
@@ -251,27 +187,13 @@ export default function AdminCrowdfundingPage() {
 
   const handleUpdateInvestmentStatus = async (investmentId: string, status: string) => {
     try {
-      // Check if we're on the client side
-      if (typeof window === 'undefined') return;
+      const response = await api.put(`/api/crowdfunding/admin/investments/${investmentId}`, { status });
       
-      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      
-      const response = await fetch(`http://localhost:5000/api/crowdfunding/admin/investments/${investmentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data && response.data.success) {
         loadData();
         alert('Investment status updated successfully!');
       } else {
-        alert(data.message || 'Failed to update investment status');
+        alert(response.data?.message || 'Failed to update investment status');
       }
     } catch (error) {
       console.error('Update investment status error:', error);
@@ -417,7 +339,7 @@ export default function AdminCrowdfundingPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {contracts.map((contract) => (
+                    {contracts && Array.isArray(contracts) && contracts.map((contract) => (
                       <div key={contract.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -505,7 +427,7 @@ export default function AdminCrowdfundingPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {investments.map((investment) => (
+                    {investments && Array.isArray(investments) && investments.map((investment) => (
                       <div key={investment.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">

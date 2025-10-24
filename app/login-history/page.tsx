@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
+import api from '@/lib/api';
 
 interface LoginRecord {
   id: number;
@@ -37,13 +38,9 @@ export default function LoginHistoryPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.get('/api/auth/verify');
 
-      if (!response.ok) {
+      if (!response.data) {
         Cookies.remove('authToken');
         router.push('/login');
         return;
@@ -62,18 +59,11 @@ export default function LoginHistoryPage() {
       setLoading(true);
       const token = Cookies.get('authToken');
       
-      const response = await fetch('http://localhost:5000/api/auth/login-history?limit=100', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.get('/api/auth/login-history?limit=100');
 
-      if (!response.ok) {
-        throw new Error('Failed to load login history');
+      if (response.data) {
+        setLoginHistory(response.data.data || []);
       }
-
-      const data = await response.json();
-      setLoginHistory(data.data || []);
     } catch (error) {
       console.error('Error loading login history:', error);
       setError('Failed to load login history');

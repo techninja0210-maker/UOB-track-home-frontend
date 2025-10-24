@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
+import api from '@/lib/api';
 
 interface GeoRestrictions {
   restrictedCountries: string[];
@@ -38,20 +39,9 @@ export default function GeoRestrictionsPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.get('/api/auth/verify');
 
-      if (!response.ok) {
-        Cookies.remove('authToken');
-        router.push('/login');
-        return;
-      }
-
-      const userData = await response.json();
-      if (userData.user.role !== 'admin') {
+      if (response.data && response.data.user && response.data.user.role !== 'admin') {
         router.push('/');
         return;
       }
@@ -59,7 +49,6 @@ export default function GeoRestrictionsPage() {
       loadRestrictions();
     } catch (error) {
       console.error('Authentication check failed:', error);
-      Cookies.remove('authToken');
       router.push('/login');
     }
   };
@@ -67,20 +56,11 @@ export default function GeoRestrictionsPage() {
   const loadRestrictions = async () => {
     try {
       setLoading(true);
-      const token = Cookies.get('authToken');
-      
-      const response = await fetch('http://localhost:5000/api/auth/admin/geo-restrictions', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.get('/api/auth/admin/geo-restrictions');
 
-      if (!response.ok) {
-        throw new Error('Failed to load restrictions');
+      if (response.data) {
+        setRestrictions(response.data.data);
       }
-
-      const data = await response.json();
-      setRestrictions(data.data);
     } catch (error) {
       console.error('Error loading restrictions:', error);
       setMessage('Failed to load geographic restrictions');
@@ -93,23 +73,14 @@ export default function GeoRestrictionsPage() {
   const saveRestrictions = async () => {
     try {
       setSaving(true);
-      const token = Cookies.get('authToken');
-      
-      const response = await fetch('http://localhost:5000/api/auth/admin/geo-restrictions', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(restrictions)
-      });
+      const response = await api.put('/api/auth/admin/geo-restrictions', restrictions);
 
-      if (!response.ok) {
+      if (response.data && response.data.success) {
+        setMessage('Geographic restrictions updated successfully');
+        setMessageType('success');
+      } else {
         throw new Error('Failed to save restrictions');
       }
-
-      setMessage('Geographic restrictions updated successfully');
-      setMessageType('success');
     } catch (error) {
       console.error('Error saving restrictions:', error);
       setMessage('Failed to save geographic restrictions');

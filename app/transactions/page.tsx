@@ -145,12 +145,13 @@ export default function TransactionsPage() {
   const downloadTransactionsPDF = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/exports/transactions/pdf', {
+      const response = await api.get('/api/exports/transactions/pdf', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.ok) {
-        const blob = await response.blob();
+      if (response.data) {
+        // Create blob from response data
+        const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -168,12 +169,13 @@ export default function TransactionsPage() {
   const downloadTransactionsCSV = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/exports/transactions/csv', {
+      const response = await api.get('/api/exports/transactions/csv', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.ok) {
-        const blob = await response.blob();
+      if (response.data) {
+        // Create blob from response data
+        const blob = new Blob([response.data], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

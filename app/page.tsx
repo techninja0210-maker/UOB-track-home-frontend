@@ -155,15 +155,19 @@ export default function Dashboard() {
         .then((accounts: string[]) => {
           if (accounts.length > 0) {
             setMmAddress(accounts[0]);
-            setupMetaMaskConnection(accounts[0]);
+            // Use setTimeout to avoid blocking the main thread
+            setTimeout(() => {
+              setupMetaMaskConnection(accounts[0]);
+            }, 100);
           }
         })
         .catch((error: unknown) => {
           // Silently handle MetaMask not available
           if (error && typeof error === 'object' && 'message' in error && 
               typeof error.message === 'string' && 
-              error.message.includes('MetaMask extension not found')) {
-            console.log('MetaMask extension not found - this is expected if not installed');
+              (error.message.includes('MetaMask extension not found') ||
+               error.message.includes('Failed to connect to MetaMask'))) {
+            console.log('MetaMask not available - this is expected if not installed');
           }
         });
     }
@@ -361,12 +365,20 @@ export default function Dashboard() {
       setMmBalance(balanceInEth.toFixed(4));
       setMmConnected(true);
 
-      // Get pool address
-      await getPoolAddress();
+      // Get pool address (with error handling)
+      try {
+        await getPoolAddress();
+      } catch (poolError) {
+        console.log('Pool address not available:', poolError);
+      }
 
-      // Load ERC20 (USDT) balance if selected
+      // Load ERC20 (USDT) balance if selected (with error handling)
       if (depositCurrency === 'USDT') {
-        await loadUsdtBalance(addressToUse);
+        try {
+          await loadUsdtBalance(addressToUse);
+        } catch (usdtError) {
+          console.log('USDT balance not available:', usdtError);
+        }
       }
 
       // Set up event listeners
@@ -380,8 +392,9 @@ export default function Dashboard() {
       // Don't show error notifications for automatic connection attempts
       if (error && typeof error === 'object' && 'message' in error && 
           typeof error.message === 'string' && 
-          error.message.includes('MetaMask extension not found')) {
-        console.log('MetaMask extension not found - this is expected if not installed');
+          (error.message.includes('MetaMask extension not found') || 
+           error.message.includes('Failed to connect to MetaMask'))) {
+        console.log('MetaMask connection failed - this is expected if not available');
         return;
       }
     }
@@ -497,6 +510,13 @@ export default function Dashboard() {
     try {
       const token = getUsdtContractAddress();
       if (!token) { setMmTokenBalance(''); return; }
+      
+      // Check if ethereum is available
+      if (typeof window === 'undefined' || !(window as any).ethereum) {
+        setMmTokenBalance('');
+        return;
+      }
+      
       // balanceOf(address) selector: 0x70a08231
       const data = '0x70a08231' + holder.replace('0x', '').padStart(64, '0');
       const result = await (window as any).ethereum.request({
@@ -507,7 +527,7 @@ export default function Dashboard() {
       const human = raw / Math.pow(10, 6); // USDT decimals = 6
       setMmTokenBalance(human.toFixed(2));
     } catch (e) {
-      console.error('USDT balance error', e);
+      console.log('USDT balance not available:', e);
       setMmTokenBalance('');
     }
   };
@@ -593,12 +613,13 @@ export default function Dashboard() {
   const downloadGoldHoldingsPDF = async () => {
     try {
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/exports/gold-holdings/pdf', {
+      const response = await api.get('/api/exports/gold-holdings/pdf', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.ok) {
-        const blob = await response.blob();
+      if (response.data) {
+        // Create blob from response data
+        const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
