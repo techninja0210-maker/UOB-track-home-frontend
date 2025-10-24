@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -26,7 +26,24 @@ export default function SignupPage() {
     confirmPassword: false
   });
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [userIP, setUserIP] = useState<string>('');
   const router = useRouter();
+
+  // Get user's IP address on component mount
+  useEffect(() => {
+    const getUserIP = async () => {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        setUserIP(data.ip);
+      } catch (error) {
+        console.log('Could not get user IP:', error);
+        setUserIP(''); // Fallback to empty string
+      }
+    };
+    
+    getUserIP();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
