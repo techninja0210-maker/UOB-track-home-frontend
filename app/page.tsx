@@ -852,9 +852,6 @@ export default function Dashboard() {
           <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
             Exchange
           </Link>
-          <Link href="/account-settings" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            Settings
-          </Link>
             </div>
 
             {/* User Profile */}
@@ -937,9 +934,6 @@ export default function Dashboard() {
             </Link>
             <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Exchange
-            </Link>
-            <Link href="/account-settings" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              Settings
             </Link>
           </div>
         </div>
