@@ -88,8 +88,8 @@ export default function MobileProfilePage() {
           <div className="profile-avatar">
             <img src="https://via.placeholder.com/100/FFD700/FFFFFF?text=U" alt="Profile" className="avatar-img" />
           </div>
-          <h2 className="profile-name">{user.fullName}</h2>
-          <p className="profile-email">{user.email}</p>
+          <h2 className="profile-name">{user?.fullName || 'User'}</h2>
+          <p className="profile-email">{user?.email || 'user@example.com'}</p>
           
           <div className="profile-actions">
             <button className="action-btn">Edit Profile</button>
