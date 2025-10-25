@@ -29,7 +29,7 @@ export default function AdminGoldPricing() {
     maximum_order: 1000,
     auto_update: true
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -126,15 +126,6 @@ export default function AdminGoldPricing() {
     }
   };
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-      </AdminLayout>
-    );
-  }
 
   return (
     <AdminLayout>

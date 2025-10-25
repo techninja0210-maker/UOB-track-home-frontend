@@ -45,7 +45,7 @@ export default function AdminCrowdfundingPage() {
   const router = useRouter();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'contracts' | 'investments'>('contracts');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);

@@ -27,7 +27,7 @@ interface WithdrawalRequest {
 export default function AdminPoolWallets() {
   const [poolWallets, setPoolWallets] = useState<PoolWallet[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('BTC');
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
@@ -226,15 +226,6 @@ export default function AdminPoolWallets() {
     }).format(balance);
   };
 
-  if (loading) {
-    return (
-      <AdminLayout title="Pool Wallets" subtitle="Manage platform pool wallets">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600"></div>
-        </div>
-      </AdminLayout>
-    );
-  }
 
   return (
     <AdminLayout title="Pool Wallets" subtitle="Manage platform pool wallets">

@@ -16,12 +16,22 @@ interface User {
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    email: '',
+    role: 'user'
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -124,15 +134,93 @@ export default function AdminUsers() {
     setShowUserModal(true);
   };
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-        </div>
-      </AdminLayout>
-    );
-  }
+  const openEditModal = (user: User) => {
+    setSelectedUser(user);
+    setEditForm({
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role
+    });
+    setShowEditModal(true);
+  };
+
+  const openPasswordModal = (user: User) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setShowPasswordModal(true);
+  };
+
+  const handleEditUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      setActionLoading(true);
+      const response = await api.put(`/api/admin/users/${selectedUser.id}`, editForm);
+      
+      setMessage({ type: 'success', text: response.data.message });
+      setShowEditModal(false);
+      loadUsers(); // Refresh the users list
+      
+      // Auto-hide success message
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to update user' 
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSuspendUser = async (user: User) => {
+    try {
+      setActionLoading(true);
+      const isActive = user.is_active;
+      const response = await api.patch(`/api/admin/users/${user.id}/status`, {
+        is_active: !isActive
+      });
+      
+      setMessage({ type: 'success', text: response.data.message });
+      loadUsers(); // Refresh the users list
+      
+      // Auto-hide success message
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to update user status' 
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser || !newPassword) return;
+
+    try {
+      setActionLoading(true);
+      const response = await api.post(`/api/admin/users/${selectedUser.id}/reset-password`, {
+        new_password: newPassword
+      });
+      
+      setMessage({ type: 'success', text: response.data.message });
+      setShowPasswordModal(false);
+      setNewPassword('');
+      
+      // Auto-hide success message
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to reset password' 
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
 
   return (
     <AdminLayout>
@@ -335,11 +423,18 @@ export default function AdminUsers() {
                       >
                         View
                       </button>
-                      <button className="text-blue-600 hover:text-blue-900 mr-4">
+                      <button 
+                        onClick={() => openEditModal(user)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                      >
                         Edit
                       </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Suspend
+                      <button 
+                        onClick={() => handleSuspendUser(user)}
+                        disabled={actionLoading}
+                        className={`${user.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'} ${actionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {user.is_active ? 'Suspend' : 'Activate'}
                       </button>
                     </td>
                   </tr>
@@ -412,11 +507,155 @@ export default function AdminUsers() {
               </div>
               
               <div className="mt-6 flex space-x-3">
-                <button className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200">
+                <button 
+                  onClick={() => {
+                    setShowUserModal(false);
+                    openEditModal(selectedUser);
+                  }}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+                >
                   Edit User
                 </button>
-                <button className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200">
+                <button 
+                  onClick={() => {
+                    setShowUserModal(false);
+                    openPasswordModal(selectedUser);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
                   Reset Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Message Display */}
+      {message && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+          message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Edit User</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                  <input
+                    type="text"
+                    value={editForm.full_name}
+                    onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={handleEditUser}
+                  disabled={actionLoading}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? 'Updating...' : 'Update User'}
+                </button>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showPasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Reset Password</h3>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">User</label>
+                  <p className="text-sm text-gray-900">{selectedUser.full_name} ({selectedUser.email})</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 6 characters)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={handleResetPassword}
+                  disabled={actionLoading || !newPassword || newPassword.length < 6}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

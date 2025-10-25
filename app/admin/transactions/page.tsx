@@ -41,12 +41,18 @@ interface Withdrawal {
 export default function AdminTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'transactions' | 'withdrawals'>('transactions');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | Withdrawal | null>(null);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -69,7 +75,9 @@ export default function AdminTransactions() {
   const loadTransactions = async () => {
     try {
       const response = await api.get('/api/admin/transactions');
-      setTransactions(response.data || []);
+      const transactions = response.data || [];
+      setTransactions(transactions);
+      
     } catch (error) {
       console.error('Error loading transactions:', error);
       setTransactions([]);
@@ -79,7 +87,9 @@ export default function AdminTransactions() {
   const loadWithdrawals = async () => {
     try {
       const response = await api.get('/api/withdrawals/admin');
-      setWithdrawals(response.data.data || []);
+      const withdrawals = response.data.data || [];
+      setWithdrawals(withdrawals);
+      
     } catch (error) {
       console.error('Error loading withdrawals:', error);
       setWithdrawals([]);
@@ -87,28 +97,52 @@ export default function AdminTransactions() {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (transaction.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.user_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (transaction.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (transaction.user_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (transaction.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (transaction.transaction_hash || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
-    const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
+    const matchesStatus = statusFilter === 'all' || (transaction.status || '').toLowerCase() === statusFilter.toLowerCase();
+    const matchesType = typeFilter === 'all' || (transaction.type || '').toLowerCase() === typeFilter.toLowerCase();
+    
     
     return matchesSearch && matchesStatus && matchesType;
   });
 
   const filteredWithdrawals = withdrawals.filter(withdrawal => {
-    const matchesSearch = withdrawal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         withdrawal.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (withdrawal.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (withdrawal.user_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (withdrawal.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (withdrawal.user_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         withdrawal.destination_address.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || withdrawal.status === statusFilter;
+                         (withdrawal.destination_address || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || (withdrawal.status || '').toLowerCase() === statusFilter.toLowerCase();
     
     return matchesSearch && matchesStatus;
   });
+
+
+  // Pagination logic
+  const currentData = activeTab === 'transactions' ? filteredTransactions : filteredWithdrawals;
+  const totalPages = Math.ceil(currentData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = currentData.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, typeFilter, activeTab]);
+
+  const handleViewTransaction = (transaction: Transaction | Withdrawal) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionModal(true);
+  };
+
+  const closeTransactionModal = () => {
+    setShowTransactionModal(false);
+    setSelectedTransaction(null);
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -185,15 +219,6 @@ export default function AdminTransactions() {
     }
   };
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-        </div>
-      </AdminLayout>
-    );
-  }
 
   return (
     <AdminLayout>
@@ -376,64 +401,64 @@ export default function AdminTransactions() {
         {/* Transactions Table */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-soft overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ minWidth: '800px' }}>
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-2/5 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Transaction
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-1/6 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     User
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-1/6 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-1/12 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-1/6 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
                   {activeTab === 'withdrawals' && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="w-1/12 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fee
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-1/12 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {activeTab === 'transactions' && filteredTransactions.map((transaction) => (
+                {activeTab === 'transactions' && paginatedData.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       <div className="flex items-center">
-                        {getTransactionIcon(transaction.type)}
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {transaction.description || transaction.type.replace('_', ' ')}
-                            {transaction.gold_grams && (
-                              <span className="text-xs text-gray-500 ml-2">
-                                ({transaction.gold_grams}g gold)
+                        {getTransactionIcon((transaction as Transaction).type)}
+                        <div className="ml-3 min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {(transaction as Transaction).description || (transaction as Transaction).type.replace('_', ' ')}
+                            {(transaction as Transaction).gold_grams && (
+                              <span className="text-xs text-gray-500 ml-1">
+                                ({(transaction as Transaction).gold_grams}g)
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {transaction.id}
+                          <div className="text-xs text-gray-500 truncate">
+                            ID: {transaction.id.substring(0, 8)}...
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {transaction.user_name || 'Unknown User'}
+                    <td className="px-4 py-4">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {transaction.user_name || 'Unknown'}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {transaction.user_email || transaction.user_id}
+                      <div className="text-xs text-gray-500 truncate">
+                        {transaction.user_email ? transaction.user_email.split('@')[0] + '@...' : transaction.user_id?.substring(0, 8) + '...'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       <div className="text-sm text-gray-900">
                         {transaction.currency === 'USD' || transaction.currency === 'USDT' 
                           ? formatCurrency(transaction.amount)
@@ -441,15 +466,23 @@ export default function AdminTransactions() {
                         }
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       {getStatusBadge(transaction.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(transaction.created_at)}
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-gray-900">
+                        {new Date(transaction.created_at).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(transaction.created_at).toLocaleTimeString()}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium min-w-[120px]">
+                    <td className="px-4 py-4">
                       <div className="flex flex-col space-y-1">
-                        <button className="text-primary-600 hover:text-primary-900 text-left">
+                        <button 
+                          onClick={() => handleViewTransaction(transaction)}
+                          className="text-primary-600 hover:text-primary-900 text-left text-sm"
+                        >
                           View
                         </button>
                         {transaction.transaction_hash && (
@@ -468,52 +501,62 @@ export default function AdminTransactions() {
                   </tr>
                 ))}
                 
-                {activeTab === 'withdrawals' && filteredWithdrawals.map((withdrawal) => (
+                {activeTab === 'withdrawals' && paginatedData.map((withdrawal) => (
                   <tr key={withdrawal.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       <div className="flex items-center">
                         {getTransactionIcon('withdrawal')}
-                        <div className="ml-4">
+                        <div className="ml-3 min-w-0 flex-1">
                           <div className="text-sm font-medium text-gray-900">
                             Withdrawal
                           </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {withdrawal.id}
+                          <div className="text-xs text-gray-500 truncate">
+                            ID: {withdrawal.id.substring(0, 8)}...
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {withdrawal.user_name || 'Unknown User'}
+                    <td className="px-4 py-4">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {withdrawal.user_name || 'Unknown'}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {withdrawal.user_email || withdrawal.user_id}
+                      <div className="text-xs text-gray-500 truncate">
+                        {withdrawal.user_email ? withdrawal.user_email.split('@')[0] + '@...' : withdrawal.user_id?.substring(0, 8) + '...'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       <div className="text-sm text-gray-900">
-                        {formatCrypto(withdrawal.amount, withdrawal.currency)}
+                        {formatCrypto((withdrawal as Withdrawal).amount, (withdrawal as Withdrawal).currency)}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Net: {formatCrypto(withdrawal.net_amount, withdrawal.currency)}
+                        Net: {formatCrypto((withdrawal as Withdrawal).net_amount, (withdrawal as Withdrawal).currency)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(withdrawal.status)}
+                    <td className="px-4 py-4">
+                      {getStatusBadge((withdrawal as Withdrawal).status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(withdrawal.created_at)}
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-gray-900">
+                        {new Date((withdrawal as Withdrawal).created_at).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date((withdrawal as Withdrawal).created_at).toLocaleTimeString()}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCrypto(withdrawal.fee, withdrawal.currency)}
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-gray-900">
+                        {formatCrypto((withdrawal as Withdrawal).fee, (withdrawal as Withdrawal).currency)}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium min-w-[120px]">
+                    <td className="px-4 py-4">
                       <div className="flex flex-col space-y-1">
-                        <button className="text-primary-600 hover:text-primary-900 text-left">
+                        <button 
+                          onClick={() => handleViewTransaction(withdrawal)}
+                          className="text-primary-600 hover:text-primary-900 text-left text-sm"
+                        >
                           View
                         </button>
-                        {withdrawal.status === 'pending' && (
+                        {(withdrawal as Withdrawal).status === 'pending' && (
                           <button
                             onClick={() => processWithdrawal(withdrawal.id)}
                             disabled={processingId === withdrawal.id}
@@ -522,13 +565,13 @@ export default function AdminTransactions() {
                             {processingId === withdrawal.id ? 'Processing...' : 'Process'}
                           </button>
                         )}
-                        {withdrawal.transaction_hash && (
+                        {(withdrawal as Withdrawal).transaction_hash && (
                           <a
-                            href={`https://sepolia.etherscan.io/tx/${withdrawal.transaction_hash}`}
+                            href={`https://sepolia.etherscan.io/tx/${(withdrawal as Withdrawal).transaction_hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900 text-left text-xs"
-                            title={`View transaction on Etherscan: ${withdrawal.transaction_hash}`}
+                            title={`View transaction on Etherscan: ${(withdrawal as Withdrawal).transaction_hash}`}
                           >
                             Explorer
                           </a>
@@ -540,6 +583,81 @@ export default function AdminTransactions() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                    <span className="font-medium">{Math.min(endIndex, currentData.length)}</span> of{' '}
+                    <span className="font-medium">{currentData.length}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Previous</span>
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (pageNum > totalPages) return null;
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            pageNum === currentPage
+                              ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Next</span>
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Empty State */}
           {(activeTab === 'transactions' && filteredTransactions.length === 0) || 
@@ -555,6 +673,108 @@ export default function AdminTransactions() {
             </div>
           ) : null}
         </div>
+
+        {/* Transaction Detail Modal */}
+        {showTransactionModal && selectedTransaction && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Transaction Details</h3>
+                  <button
+                    onClick={closeTransactionModal}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Transaction ID</label>
+                    <p className="text-sm text-gray-900 font-mono">{selectedTransaction.id}</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">User</label>
+                    <p className="text-sm text-gray-900">
+                      {(selectedTransaction as any).user_name || 'Unknown User'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {(selectedTransaction as any).user_email || (selectedTransaction as any).user_id}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Amount</label>
+                    <p className="text-sm text-gray-900">
+                      {(selectedTransaction as any).currency === 'USD' || (selectedTransaction as any).currency === 'USDT' 
+                        ? formatCurrency((selectedTransaction as any).amount)
+                        : formatCrypto((selectedTransaction as any).amount, (selectedTransaction as any).currency)
+                      }
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <div className="mt-1">
+                      {getStatusBadge((selectedTransaction as any).status)}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date</label>
+                    <p className="text-sm text-gray-900">{formatDate((selectedTransaction as any).created_at)}</p>
+                  </div>
+                  
+                  {(selectedTransaction as any).transaction_hash && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Transaction Hash</label>
+                      <p className="text-sm text-gray-900 font-mono break-all">
+                        {(selectedTransaction as any).transaction_hash}
+                      </p>
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${(selectedTransaction as any).transaction_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-900 text-sm"
+                      >
+                        View on Etherscan →
+                      </a>
+                    </div>
+                  )}
+                  
+                  {(selectedTransaction as any).description && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Description</label>
+                      <p className="text-sm text-gray-900">{(selectedTransaction as any).description}</p>
+                    </div>
+                  )}
+                  
+                  {(selectedTransaction as any).destination_address && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Destination Address</label>
+                      <p className="text-sm text-gray-900 font-mono break-all">
+                        {(selectedTransaction as any).destination_address}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-6 flex space-x-3">
+                  <button
+                    onClick={closeTransactionModal}
+                    className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

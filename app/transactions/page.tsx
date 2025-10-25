@@ -30,7 +30,7 @@ interface Transaction {
 export default function TransactionsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -120,8 +120,6 @@ export default function TransactionsPage() {
       console.error('Error loading transactions:', error);
       // Set empty array if API fails - no more mock data
       setTransactions([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -261,13 +259,6 @@ export default function TransactionsPage() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white">

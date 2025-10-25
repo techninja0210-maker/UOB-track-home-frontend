@@ -16,7 +16,6 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
@@ -70,8 +69,6 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     } catch (error) {
       console.error('Authentication error:', error);
       router.push('/login');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -92,13 +89,6 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -108,31 +98,27 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <Link href="/admin" className="flex items-center space-x-3">
+              <Link href="/admin" className="flex items-center">
                 <Image
                   src="/UOB_logo.png"
                   alt="UOB Security House"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 rounded-lg object-contain"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-lg object-contain"
                   priority
                 />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
-                  <p className="text-xs text-gray-500">Admin Panel</p>
-                </div>
               </Link>
             </div>
 
             {/* Navigation Links */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center space-x-6">
               {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`text-sm font-medium transition-colors duration-200 ${
+                    className={`text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
                       isActive
                         ? 'text-primary-600 border-b-2 border-primary-600 pb-1'
                         : 'text-gray-600 hover:text-gray-900'
@@ -212,7 +198,7 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`block px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                  className={`block px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap ${
                     isActive
                       ? 'bg-primary-50 text-primary-600'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'

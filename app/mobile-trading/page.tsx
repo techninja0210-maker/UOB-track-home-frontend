@@ -35,7 +35,7 @@ interface TradingItem {
 
 export default function MobileTradingPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('crypto');
   const [assetCards, setAssetCards] = useState<AssetCard[]>([]);
   const [tradingItems, setTradingItems] = useState<TradingItem[]>([]);
@@ -172,13 +172,6 @@ export default function MobileTradingPage() {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="mobile-loading">
-        <div className="loading-spinner"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="mobile-trading">
@@ -723,29 +716,6 @@ export default function MobileTradingPage() {
           font-weight: bold;
         }
 
-        .mobile-loading {
-          width: 375px;
-          height: 812px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #1A1A1A;
-          margin: 0 auto;
-        }
-
-        .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid #333;
-          border-top: 4px solid #FFD700;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
 
         @media (max-width: 375px) {
           .mobile-trading {

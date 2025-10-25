@@ -66,7 +66,7 @@ export default function Dashboard() {
   const [goldHoldings, setGoldHoldings] = useState<GoldHolding[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [skrReceipts, setSkrReceipts] = useState<SKRReceipt[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -206,7 +206,6 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
 
       // Load wallet balances (legacy - keeping for compatibility)
@@ -251,8 +250,6 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -800,13 +797,6 @@ export default function Dashboard() {
   const hasGoldData = goldHoldings && goldHoldings.length > 0;
   const hasSkrData = skrReceipts && skrReceipts.length > 0;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -819,20 +809,14 @@ export default function Dashboard() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <div className="flex items-center space-x-3">
-                <Image
-                  src="/UOB_logo.png"
-                  alt="UOB Security House"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 rounded-lg object-contain"
-                  priority
-                />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
-                  <p className="text-xs text-gray-500">Secure Gold Trading</p>
-                </div>
-              </div>
+              <Image
+                src="/UOB_logo.png"
+                alt="UOB Security House"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-lg object-contain"
+                priority
+              />
             </div>
 
             {/* Navigation Links */}

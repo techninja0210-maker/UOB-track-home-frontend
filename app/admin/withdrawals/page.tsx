@@ -27,15 +27,15 @@ interface WithdrawalRequest {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
-  fullName: string;
-  email: string;
+  fullName?: string;
+  email?: string;
   phone?: string;
 }
 
 export default function AdminWithdrawalsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<WithdrawalRequest | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -179,13 +179,6 @@ export default function AdminWithdrawalsPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  if (!user) {
-    return (
-      <div className="admin-loading">
-        <div className="loading-spinner"></div>
-      </div>
-    );
-  }
 
   return (
     <AdminLayout title="Withdrawal Management" subtitle="Manage user withdrawal requests">
@@ -249,13 +242,7 @@ export default function AdminWithdrawalsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="text-center">
-                    <div className="loading-spinner"></div>
-                  </td>
-                </tr>
-              ) : withdrawals.length === 0 ? (
+              {withdrawals.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center">
                     No withdrawal requests found
@@ -267,8 +254,8 @@ export default function AdminWithdrawalsPage() {
                     <td>#{withdrawal.id}</td>
                     <td>
                       <div className="user-info">
-                        <div className="user-name">{withdrawal.fullName}</div>
-                        <div className="user-email">{withdrawal.email}</div>
+                        <div className="user-name">{withdrawal.fullName || 'Unknown User'}</div>
+                        <div className="user-email">{withdrawal.email || `User ID: ${withdrawal.userId}`}</div>
                       </div>
                     </td>
                     <td>{withdrawal.currency}</td>
@@ -340,7 +327,7 @@ export default function AdminWithdrawalsPage() {
               </div>
               <div className="modal-body">
                 <div className="withdrawal-details">
-                  <p><strong>User:</strong> {selectedWithdrawal.fullName} ({selectedWithdrawal.email})</p>
+                  <p><strong>User:</strong> {selectedWithdrawal.fullName || 'Unknown User'} ({selectedWithdrawal.email || `User ID: ${selectedWithdrawal.userId}`})</p>
                   <p><strong>Amount:</strong> {selectedWithdrawal.amount} {selectedWithdrawal.currency}</p>
                   <p><strong>Destination:</strong> {selectedWithdrawal.destinationAddress}</p>
                 </div>
@@ -674,20 +661,6 @@ export default function AdminWithdrawalsPage() {
           text-align: center;
         }
 
-        .loading-spinner {
-          width: 20px;
-          height: 20px;
-          border: 2px solid #f3f3f3;
-          border-top: 2px solid #2563eb;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
       `}</style>
     </AdminLayout>
   );

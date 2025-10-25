@@ -189,7 +189,6 @@ export default function ExchangePage() {
   const executeBuy = async () => {
     if (!buyCalculation) return;
     
-    setLoading(true);
     setMessage(null);
     
     try {
@@ -207,15 +206,12 @@ export default function ExchangePage() {
       loadPrices(); // Refresh prices
     } catch (error: any) {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Purchase failed' });
-    } finally {
-      setLoading(false);
     }
   };
   
   const executeSell = async () => {
     if (!sellCalculation) return;
     
-    setLoading(true);
     setMessage(null);
     
     try {
@@ -233,8 +229,6 @@ export default function ExchangePage() {
       loadPrices(); // Refresh prices
     } catch (error: any) {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Sale failed' });
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -31,7 +31,7 @@ interface SKRRecord {
 export default function SKRsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [skrRecords, setSkrRecords] = useState<SKRRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [selectedSKR, setSelectedSKR] = useState<SKRRecord | null>(null);
@@ -131,8 +131,6 @@ export default function SKRsPage() {
     } catch (error) {
       console.error('Error loading SKR data:', error);
       setSkrRecords([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -192,13 +190,6 @@ export default function SKRsPage() {
   const totalProfitLoss = skrRecords.reduce((sum, record) => sum + record.profitLoss, 0);
   const totalValue = skrRecords.reduce((sum, record) => sum + (record.currentPrice * record.goldAmount), 0);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white">

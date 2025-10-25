@@ -75,7 +75,7 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cryptoPrices, setCryptoPrices] = useState<{[key: string]: number}>({});
   const [activeTab, setActiveTab] = useState('external');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -399,16 +399,6 @@ export default function WalletPage() {
     }, 0);
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading wallet...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -454,9 +444,9 @@ export default function WalletPage() {
                 className="flex items-center space-x-3 text-sm"
               >
                 <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium text-sm">{user.fullName.charAt(0)}</span>
+                  <span className="text-white font-medium text-sm">{user?.fullName?.charAt(0) || 'U'}</span>
                 </div>
-                <span className="text-gray-700">{user.fullName}</span>
+                <span className="text-gray-700">{user?.fullName || 'User'}</span>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
