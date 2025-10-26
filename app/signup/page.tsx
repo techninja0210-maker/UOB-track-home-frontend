@@ -11,7 +11,8 @@ export default function SignupPage() {
     fullName: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    referralCode: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -29,7 +30,7 @@ export default function SignupPage() {
   const [userIP, setUserIP] = useState<string>('');
   const router = useRouter();
 
-  // Get user's IP address on component mount
+  // Get user's IP address and check for referral code on component mount
   useEffect(() => {
     const getUserIP = async () => {
       try {
@@ -41,6 +42,13 @@ export default function SignupPage() {
         setUserIP(''); // Fallback to empty string
       }
     };
+    
+    // Check for referral code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setFormData(prev => ({ ...prev, referralCode: refCode }));
+    }
     
     getUserIP();
   }, []);
@@ -136,7 +144,8 @@ export default function SignupPage() {
       const response = await api.post('/api/auth/signup', {
         fullName: formData.fullName,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        referralCode: formData.referralCode || undefined
       });
 
       setMessage('Account created successfully! Redirecting to login...');
@@ -344,6 +353,27 @@ export default function SignupPage() {
                 )}
               </div>
             </div>
+
+            {/* Referral Code Field */}
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
+                Referral Code (Optional)
+              </label>
+              <div className="mt-1">
+                <input 
+                  id="referralCode"
+                  name="referralCode"
+                  type="text" 
+                  value={formData.referralCode}
+                  onChange={handleChange}
+                  placeholder="Enter referral code if you have one"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Get a referral code from a friend to earn bonuses
+                </p>
+          </div>
+        </div>
         
         {/* Terms and Conditions */}
             <div className="flex items-center">
