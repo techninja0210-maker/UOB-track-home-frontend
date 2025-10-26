@@ -28,6 +28,25 @@ export default function AdminSKRs() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedSKR, setSelectedSKR] = useState<SKR | null>(null);
   const [showSKRModal, setShowSKRModal] = useState(false);
+  
+  // Edit functionality
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    skr_number: '',
+    gold_weight: '',
+    status: ''
+  });
+  
+  // Transfer functionality
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    new_user_id: '',
+    transfer_reason: ''
+  });
+  
+  // Action states
+  const [actionLoading, setActionLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
     loadSKRs();
@@ -35,14 +54,11 @@ export default function AdminSKRs() {
 
   const loadSKRs = async () => {
     try {
-      setLoading(true);
       const response = await api.get('/api/admin/skrs');
       setSkrs(response.data || []);
     } catch (error) {
       console.error('Error loading SKRs:', error);
       setSkrs([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -76,10 +92,9 @@ export default function AdminSKRs() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      active: { color: 'bg-green-100 text-green-800', label: 'Active' },
-      expired: { color: 'bg-red-100 text-red-800', label: 'Expired' },
-      redeemed: { color: 'bg-purple-100 text-purple-800', label: 'Redeemed' },
-      suspended: { color: 'bg-yellow-100 text-yellow-800', label: 'Suspended' },
+      holding: { color: 'bg-green-100 text-green-800', label: 'Holding' },
+      active: { color: 'bg-blue-100 text-blue-800', label: 'Active' },
+      sold: { color: 'bg-red-100 text-red-800', label: 'Sold/Suspended' },
       pending: { color: 'bg-gray-100 text-gray-800', label: 'Pending' }
     };
     
@@ -124,10 +139,106 @@ export default function AdminSKRs() {
     setShowSKRModal(true);
   };
 
+  // Edit functionality
+  const openEditModal = (skr: SKR) => {
+    setSelectedSKR(skr);
+    setEditForm({
+      skr_number: skr.skr_number || '',
+      gold_weight: skr.gold_weight?.toString() || '',
+      status: skr.status || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSKR = async () => {
+    if (!selectedSKR) return;
+    
+    setActionLoading(true);
+    setMessage(null);
+    
+    try {
+      await api.put(`/api/admin/skrs/${selectedSKR.id}`, editForm);
+      setMessage({ type: 'success', text: 'SKR updated successfully!' });
+      setShowEditModal(false);
+      loadSKRs(); // Refresh the list
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update SKR' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Suspend functionality
+  const handleSuspendSKR = async (skr: SKR) => {
+    if (!confirm(`Are you sure you want to suspend SKR ${skr.skr_number}?`)) return;
+    
+    setActionLoading(true);
+    setMessage(null);
+    
+    try {
+      await api.patch(`/api/admin/skrs/${skr.id}/suspend`);
+      setMessage({ type: 'success', text: `SKR ${skr.skr_number} suspended successfully!` });
+      await loadSKRs(); // Refresh the list
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to suspend SKR' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Transfer functionality
+  const openTransferModal = (skr: SKR) => {
+    setSelectedSKR(skr);
+    setTransferForm({
+      new_user_id: '',
+      transfer_reason: ''
+    });
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSKR = async () => {
+    if (!selectedSKR) return;
+    
+    setActionLoading(true);
+    setMessage(null);
+    
+    try {
+      await api.post(`/api/admin/skrs/${selectedSKR.id}/transfer`, transferForm);
+      setMessage({ type: 'success', text: `SKR ${selectedSKR.skr_number} transferred successfully!` });
+      setShowTransferModal(false);
+      loadSKRs(); // Refresh the list
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to transfer SKR' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Auto-hide messages
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
 
   return (
     <AdminLayout>
       <div>
+        {/* Message Display */}
+        {message && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            message.type === 'success' 
+              ? 'bg-green-50 text-green-800 border border-green-200' 
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {message.text}
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">SKR Management</h1>
@@ -155,7 +266,7 @@ export default function AdminSKRs() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Active SKRs</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {skrs.filter(skr => skr.status === 'active').length}
+                  {skrs.filter(skr => skr.status === 'holding' || skr.status === 'active').length}
                 </p>
           </div>
               <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
@@ -224,10 +335,9 @@ export default function AdminSKRs() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="all">All Status</option>
+                <option value="holding">Holding</option>
                 <option value="active">Active</option>
-                <option value="expired">Expired</option>
-                <option value="redeemed">Redeemed</option>
-                <option value="suspended">Suspended</option>
+                <option value="sold">Sold/Suspended</option>
                 <option value="pending">Pending</option>
                 </select>
               </div>
@@ -272,7 +382,7 @@ export default function AdminSKRs() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Value
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                     Actions
                   </th>
                 </tr>
@@ -319,19 +429,34 @@ export default function AdminSKRs() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
-                        onClick={() => openSKRModal(skr)}
-                        className="text-primary-600 hover:text-primary-900 mr-4"
-                      >
-                        View
-                      </button>
-                      <button className="text-blue-600 hover:text-blue-900 mr-4">
-                        Edit
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Suspend
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium w-48">
+                      <div className="flex flex-wrap gap-1">
+                        <button 
+                          onClick={() => openSKRModal(skr)}
+                          className="text-primary-600 hover:text-primary-900 px-2 py-1 text-xs rounded hover:bg-primary-50 transition-colors"
+                        >
+                          View
+                        </button>
+                        <button 
+                          onClick={() => openEditModal(skr)}
+                          className="text-blue-600 hover:text-blue-900 px-2 py-1 text-xs rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleSuspendSKR(skr)}
+                          disabled={actionLoading}
+                          className="text-red-600 hover:text-red-900 px-2 py-1 text-xs rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {actionLoading ? 'Processing...' : 'Suspend'}
+                        </button>
+                        <button 
+                          onClick={() => openTransferModal(skr)}
+                          className="text-green-600 hover:text-green-900 px-2 py-1 text-xs rounded hover:bg-green-50 transition-colors"
+                        >
+                          Transfer
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -425,16 +550,169 @@ export default function AdminSKRs() {
               </div>
 
               <div className="mt-6 flex space-x-3">
-                <button className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200">
+                <button 
+                  onClick={() => {
+                    setShowSKRModal(false);
+                    openEditModal(selectedSKR);
+                  }}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+                >
                   Edit SKR
                   </button>
-                <button className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200">
+                <button 
+                  onClick={() => {
+                    setShowSKRModal(false);
+                    openTransferModal(selectedSKR);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
                   Transfer
               </button>
             </div>
           </div>
         </div>
     </div>
+      )}
+
+      {/* Edit SKR Modal */}
+      {showEditModal && selectedSKR && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Edit SKR</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKR Number</label>
+                  <input
+                    type="text"
+                    value={editForm.skr_number}
+                    onChange={(e) => setEditForm({...editForm, skr_number: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gold Weight (g)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={editForm.gold_weight}
+                    onChange={(e) => setEditForm({...editForm, gold_weight: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="holding">Holding</option>
+                    <option value="active">Active</option>
+                    <option value="sold">Sold/Suspended</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={handleEditSKR}
+                  disabled={actionLoading}
+                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Updating...' : 'Update SKR'}
+                </button>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer SKR Modal */}
+      {showTransferModal && selectedSKR && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Transfer SKR</h3>
+                <button
+                  onClick={() => setShowTransferModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current SKR</label>
+                  <p className="text-sm text-gray-900">{selectedSKR.skr_number}</p>
+                  <p className="text-xs text-gray-500">Current Owner: {selectedSKR.user_name || selectedSKR.user_id}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New User ID</label>
+                  <input
+                    type="text"
+                    value={transferForm.new_user_id}
+                    onChange={(e) => setTransferForm({...transferForm, new_user_id: e.target.value})}
+                    placeholder="Enter new user ID"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Reason</label>
+                  <textarea
+                    value={transferForm.transfer_reason}
+                    onChange={(e) => setTransferForm({...transferForm, transfer_reason: e.target.value})}
+                    placeholder="Enter reason for transfer"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={handleTransferSKR}
+                  disabled={actionLoading || !transferForm.new_user_id}
+                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Transferring...' : 'Transfer SKR'}
+                </button>
+                <button
+                  onClick={() => setShowTransferModal(false)}
+                  className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );
