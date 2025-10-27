@@ -586,12 +586,38 @@ export default function Dashboard() {
             usdAmount = cryptoAmount * cryptoPrices.USDT;
           }
           
+          // Map transaction types for better display
+          let displayType = tx.type || 'unknown';
+          let displayAmount = usdAmount;
+          let displayDescription = tx.description || tx.meta?.description || 'Transaction';
+          
+          // Handle different transaction types
+          if (tx.type === 'withdrawal_request') {
+            displayType = 'withdrawal';
+            displayDescription = `Withdrawal Request: ${cryptoAmount} ${currency}`;
+          } else if (tx.type === 'withdrawal_completed') {
+            displayType = 'withdrawal';
+            displayDescription = `Withdrawal Completed: ${cryptoAmount} ${currency}`;
+          } else if (tx.type === 'withdrawal_rejected') {
+            displayType = 'withdrawal';
+            displayDescription = `Withdrawal Rejected: ${cryptoAmount} ${currency}`;
+          } else if (tx.type === 'deposit') {
+            displayType = 'deposit';
+            displayDescription = `Deposit: ${cryptoAmount} ${currency}`;
+          } else if (tx.type === 'buy_gold') {
+            displayType = 'buy';
+            displayDescription = `Gold Purchase: ${cryptoAmount} ${currency}`;
+          } else if (tx.type === 'sell_gold') {
+            displayType = 'sell';
+            displayDescription = `Gold Sale: ${cryptoAmount} ${currency}`;
+          }
+
           return {
             id: tx.id || tx.transactionId || `tx-${Date.now()}`,
-            type: tx.type || 'unknown',
-            amount: usdAmount, // Use USD equivalent for display
+            type: displayType,
+            amount: displayAmount, // Use USD equivalent for display
             currency: 'USD', // Always display as USD in Recent Activity
-            description: tx.description || tx.meta?.description || 'Transaction',
+            description: displayDescription,
             timestamp: tx.timestamp || tx.createdAt || new Date().toISOString(),
             status: tx.status || 'completed'
           };
@@ -693,6 +719,7 @@ export default function Dashboard() {
         
         console.log('✅ ETH transaction sent:', txHash);
         setDepositSuccess(`Transaction sent! Hash: ${txHash}`);
+        setDepositError(''); // Clear any previous errors
       } else if (depositCurrency === 'USDT') {
         if (!mmConnected) throw new Error('Please connect MetaMask first');
         
@@ -717,6 +744,7 @@ export default function Dashboard() {
         
         console.log('✅ USDT transaction sent:', txHash);
         setDepositSuccess(`Transaction sent! Hash: ${txHash}`);
+        setDepositError(''); // Clear any previous errors
       } else if (depositCurrency === 'BTC') {
         // BTC handled by external wallet; just surface address
         setDepositSuccess(`Send BTC to: ${poolAddress}`);
@@ -1407,33 +1435,35 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Error and Success Messages */}
-                  {depositError && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm text-red-800">{depositError}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                  {/* Success Message Only */}
                   {depositSuccess && (
                     <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-green-800 font-medium">Transaction sent!</p>
+                            <p className="text-xs text-green-600 font-mono break-all">
+                              Hash: {depositSuccess.replace('Transaction sent! Hash: ', '')}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(depositSuccess.replace('Transaction sent! Hash: ', ''));
+                            // You could add a toast notification here
+                          }}
+                          className="ml-2 p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded"
+                          title="Copy hash"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                           </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm text-green-800">{depositSuccess}</p>
-                        </div>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1457,14 +1487,14 @@ export default function Dashboard() {
                   <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                        transaction.type === 'buy' ? 'bg-green-100' : 
-                        transaction.type === 'sell' ? 'bg-red-100' : 'bg-blue-100'
+                        transaction.type === 'buy' || transaction.type === 'deposit' ? 'bg-green-100' : 
+                        transaction.type === 'sell' || transaction.type === 'withdrawal' ? 'bg-red-100' : 'bg-blue-100'
                       }`}>
                         <span className={`text-xs font-medium ${
-                          transaction.type === 'buy' ? 'text-green-600' : 
-                          transaction.type === 'sell' ? 'text-red-600' : 'text-blue-600'
+                          transaction.type === 'buy' || transaction.type === 'deposit' ? 'text-green-600' : 
+                          transaction.type === 'sell' || transaction.type === 'withdrawal' ? 'text-red-600' : 'text-blue-600'
                         }`}>
-                          {transaction.type.charAt(0).toUpperCase()}
+                          {transaction.type === 'withdrawal' ? 'W' : transaction.type.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
@@ -1473,8 +1503,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatCurrency(transaction.amount)}
+                      <p className={`text-sm font-medium ${
+                        (transaction.type === 'buy' || transaction.type === 'deposit') ? 'text-green-600' : 
+                        (transaction.type === 'sell' || transaction.type === 'withdrawal') ? 'text-red-600' : 'text-gray-900'
+                      }`}>
+                        {(transaction.type === 'buy' || transaction.type === 'deposit') ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
