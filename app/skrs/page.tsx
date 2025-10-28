@@ -157,24 +157,27 @@ export default function SKRsPage() {
       console.log('Downloading SKR PDF for ID:', skrId);
       const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       const response = await api.get(`/api/exports/skrs/${skrId}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob' // This is crucial for binary data
       });
       
       if (response.data) {
         // Create blob from response data
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `skr_${skrId}_${Date.now()}.pdf`;
         a.click();
-        window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
+        console.log('PDF downloaded successfully');
       } else {
         console.error('Failed to download individual SKR PDF:', response.status, response.data);
         alert(`Failed to download PDF: ${response.data?.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error downloading individual SKR PDF:', error);
+      alert('Failed to download PDF. Please try again.');
     }
   };
 
@@ -191,7 +194,7 @@ export default function SKRsPage() {
   const totalValue = skrRecords.reduce((sum, record) => sum + (record.currentPrice * record.goldAmount), 0);
 
 
-  return (
+    return (
     <div className="min-h-screen bg-white">
       {/* Top Navigation Bar */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -211,7 +214,7 @@ export default function SKRsPage() {
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">UOB Security House</h1>
                   <p className="text-xs text-gray-500">Secure Gold Trading</p>
-          </div>
+      </div>
               </Link>
         </div>
         
@@ -232,7 +235,7 @@ export default function SKRsPage() {
               <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Exchange
           </Link>
-            </div>
+          </div>
 
             {/* User Profile */}
             <div className="relative user-profile">
@@ -244,7 +247,7 @@ export default function SKRsPage() {
                   <span className="text-primary-600 font-medium text-sm">
                     {user?.fullName?.charAt(0) || 'U'}
                   </span>
-                </div>
+        </div>
                 <div className="hidden sm:block text-left">
                   <div className="text-sm font-medium text-gray-900">{user?.fullName}</div>
                   <div className="text-xs text-gray-500">{user?.role}</div>
@@ -266,6 +269,18 @@ export default function SKRsPage() {
                   </div>
                   <div className="border-t border-gray-200 py-1">
                     <Link
+                      href="/referrals"
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => setShowProfileDropdown(false)}
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Referral Program
+                      </div>
+          </Link>
+                    <Link
                       href="/account-settings"
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setShowProfileDropdown(false)}
@@ -277,7 +292,7 @@ export default function SKRsPage() {
                         </svg>
                         Account Settings
                       </div>
-                    </Link>
+          </Link>
                     <button
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -301,13 +316,13 @@ export default function SKRsPage() {
           <div className="px-4 py-2 space-y-1">
             <Link href="/" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Dashboard
-            </Link>
+          </Link>
             <Link href="/wallet" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Wallet
-            </Link>
+          </Link>
             <Link href="/skrs" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
               SKRs
-            </Link>
+          </Link>
             <Link href="/transactions" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Transactions
             </Link>
@@ -316,7 +331,7 @@ export default function SKRsPage() {
             </Link>
             </div>
           </div>
-      </nav>
+        </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
@@ -334,7 +349,7 @@ export default function SKRsPage() {
               Buy More Gold
             </Link>
           </div>
-        </div>
+      </div>
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -343,11 +358,11 @@ export default function SKRsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Gold</p>
                 <p className="text-2xl font-bold text-yellow-600">{formatNumber(totalGoldAmount, 4)} g</p>
-                  </div>
+            </div>
               <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
                 <span className="text-yellow-600 text-xl">🥇</span>
-                  </div>
-                  </div>
+          </div>
+            </div>
                   </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
@@ -355,14 +370,14 @@ export default function SKRsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalValue)}</p>
-                </div>
+                  </div>
               <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
-            </div>
-          </div>
-        </div>
+                  </div>
+                  </div>
+                  </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
             <div className="flex items-center justify-between">
@@ -371,7 +386,7 @@ export default function SKRsPage() {
                 <p className={`text-2xl font-bold ${totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(totalProfitLoss)}
                 </p>
-              </div>
+                </div>
               <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
