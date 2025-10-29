@@ -748,41 +748,6 @@ export default function AITradingPage() {
                                     </div>
                                   </div>
                                   
-                                  {/* Market Data */}
-                                  <div className="bg-gray-50 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-600 font-medium mb-2">Market Prices</div>
-                                    {botActivity[bot.id]?.marketData?.length > 0 ? (
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {botActivity[bot.id].marketData.slice(0, 4).map((market: any, index: number) => (
-                                          <div key={index} className="text-xs flex justify-between">
-                                            <span className="font-medium">{market.symbol}</span>
-                                            <span className={market.price_change_24h > 0 ? 'text-green-600' : 'text-red-600'}>
-                                              ${market.current_price} ({market.price_change_24h > 0 ? '+' : ''}{market.price_change_24h?.toFixed(2)}%)
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-2">
-                                        <div className="text-xs flex justify-between">
-                                          <span className="font-medium">BTCUSDT</span>
-                                          <span className="text-gray-900">${marketPrices.BTCUSDT.price.toLocaleString()}</span>
-                                        </div>
-                                        <div className="text-xs flex justify-between">
-                                          <span className="font-medium">ETHUSDT</span>
-                                          <span className="text-gray-900">${marketPrices.ETHUSDT.price.toLocaleString()}</span>
-                                        </div>
-                                        <div className="text-xs flex justify-between">
-                                          <span className="font-medium">ADAUSDT</span>
-                                          <span className="text-gray-900">${marketPrices.ADAUSDT.price}</span>
-                                        </div>
-                                        <div className="text-xs flex justify-between">
-                                          <span className="font-medium">SOLUSDT</span>
-                                          <span className="text-gray-900">${marketPrices.SOLUSDT.price}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
                                 </div>
                               ) : (
                                 <div className="text-center py-4 text-gray-500">
