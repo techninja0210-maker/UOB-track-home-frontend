@@ -27,7 +27,8 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     { href: '/admin/skrs', label: 'SKRs' },
     { href: '/admin/crowdfunding', label: 'Crowdfunding' },
     { href: '/admin/gold-pricing', label: 'Gold Pricing' },
-    { href: '/admin/pool-wallets', label: 'Pool Wallets' }
+    { href: '/admin/pool-wallets', label: 'Pool Wallets' },
+    { href: '/admin/ai-trading', label: 'AI Trading' }
   ];
 
   useEffect(() => {

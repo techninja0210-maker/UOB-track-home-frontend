@@ -225,7 +225,7 @@ export default function AdminSKRs() {
   }, [message]);
 
 
-  return (
+    return (
     <AdminLayout>
       <div>
         {/* Message Display */}
@@ -236,7 +236,7 @@ export default function AdminSKRs() {
               : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             {message.text}
-          </div>
+      </div>
         )}
 
         {/* Page Header */}
@@ -431,12 +431,12 @@ export default function AdminSKRs() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium w-48">
                       <div className="flex flex-wrap gap-1">
-                        <button 
+                      <button 
                           onClick={() => openSKRModal(skr)}
                           className="text-primary-600 hover:text-primary-900 px-2 py-1 text-xs rounded hover:bg-primary-50 transition-colors"
-                        >
+                      >
                           View
-                        </button>
+                      </button>
                         <button 
                           onClick={() => openEditModal(skr)}
                           className="text-blue-600 hover:text-blue-900 px-2 py-1 text-xs rounded hover:bg-blue-50 transition-colors"
@@ -494,13 +494,13 @@ export default function AdminSKRs() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-              </div>
+            </div>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">SKR Number</label>
                   <p className="text-sm text-gray-900">{selectedSKR.skr_number}</p>
-                  </div>
+                    </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">User ID</label>
                   <p className="text-sm text-gray-900">{selectedSKR.user_id}</p>
@@ -508,13 +508,13 @@ export default function AdminSKRs() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Gold Weight</label>
                   <p className="text-sm text-gray-900">{formatWeight(selectedSKR.gold_weight)}</p>
-                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Gold Purity</label>
                   <div className="mt-1">
                     {getPurityBadge(selectedSKR.gold_purity)}
+              </div>
                   </div>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Storage Location</label>
                   <p className="text-sm text-gray-900">{selectedSKR.storage_location}</p>
@@ -528,16 +528,16 @@ export default function AdminSKRs() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Created</label>
                   <p className="text-sm text-gray-900">{formatDate(selectedSKR.created_at)}</p>
-                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Expiry Date</label>
                   <p className="text-sm text-gray-900">{formatDate(selectedSKR.expiry_date)}</p>
-                </div>
+                  </div>
                 {selectedSKR.current_value && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Current Value</label>
                     <p className="text-sm text-gray-900">{formatCurrency(selectedSKR.current_value)}</p>
-              </div>
+                  </div>
                 )}
                 {selectedSKR.profit_loss !== undefined && (
                   <div>
@@ -545,9 +545,9 @@ export default function AdminSKRs() {
                     <p className={`text-sm font-medium ${selectedSKR.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {selectedSKR.profit_loss >= 0 ? '+' : ''}{formatCurrency(selectedSKR.profit_loss)}
                     </p>
-                </div>
+                  </div>
                 )}
-              </div>
+                  </div>
 
               <div className="mt-6 flex space-x-3">
                 <button 
@@ -568,10 +568,10 @@ export default function AdminSKRs() {
                 >
                   Transfer
               </button>
-            </div>
-          </div>
-        </div>
-    </div>
+                </div>
+              </div>
+                </div>
+              </div>
       )}
 
       {/* Edit SKR Modal */}
@@ -581,15 +581,15 @@ export default function AdminSKRs() {
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Edit SKR</h3>
-                <button
+                  <button 
                   onClick={() => setShowEditModal(false)}
                   className="text-gray-400 hover:text-gray-600"
-                >
+                  >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </button>
-              </div>
+                  </button>
+                  </div>
 
               <div className="space-y-4">
                 <div>
@@ -611,7 +611,7 @@ export default function AdminSKRs() {
                     onChange={(e) => setEditForm({...editForm, gold_weight: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
-                </div>
+              </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -625,23 +625,23 @@ export default function AdminSKRs() {
                     <option value="active">Active</option>
                     <option value="sold">Sold/Suspended</option>
                   </select>
-                </div>
+            </div>
               </div>
 
               <div className="mt-6 flex space-x-3">
-                <button
+              <button 
                   onClick={handleEditSKR}
                   disabled={actionLoading}
                   className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 disabled:opacity-50"
-                >
+              >
                   {actionLoading ? 'Updating...' : 'Update SKR'}
-                </button>
-                <button
+              </button>
+              <button 
                   onClick={() => setShowEditModal(false)}
                   className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
-                >
+              >
                   Cancel
-                </button>
+              </button>
               </div>
             </div>
           </div>
@@ -709,7 +709,7 @@ export default function AdminSKRs() {
                 >
                   Cancel
                 </button>
-              </div>
+    </div>
             </div>
           </div>
         </div>

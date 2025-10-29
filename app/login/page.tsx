@@ -71,8 +71,8 @@ function LoginPage() {
               className="h-48 w-48 object-contain mx-auto"
               priority
             />
-          </div>
-          
+      </div>
+
           {/* Welcome Text */}
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Welcome to UOB Security House
@@ -203,8 +203,8 @@ function LoginPage() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">Don't have an account?</span>
-              </div>
-            </div>
+        </div>
+      </div>
 
             <div className="mt-6">
               <Link

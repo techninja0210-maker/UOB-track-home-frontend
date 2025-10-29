@@ -235,7 +235,10 @@ export default function SKRsPage() {
               <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 Exchange
           </Link>
-          </div>
+              <Link href="/ai-trading" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                AI Trading
+          </Link>
+            </div>
 
             {/* User Profile */}
             <div className="relative user-profile">
@@ -329,8 +332,11 @@ export default function SKRsPage() {
             <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Exchange
             </Link>
-            </div>
+            <Link href="/ai-trading" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              AI Trading
+            </Link>
           </div>
+        </div>
         </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

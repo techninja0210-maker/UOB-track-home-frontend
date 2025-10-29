@@ -212,14 +212,14 @@ export default function AdminDashboard() {
           </div>
         );
       default:
-        return (
+    return (
           <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
             <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-          </div>
-        );
-    }
+      </div>
+    );
+  }
   };
 
 
@@ -332,9 +332,9 @@ export default function AdminDashboard() {
                       <svg className="h-8 w-8 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                    </div>
+              </div>
                     <p className="text-gray-500">Loading chart data...</p>
-                  </div>
+                </div>
                 </div>
               ) : chartData && chartData.length > 0 ? (
                 <div className="h-full flex flex-col">
@@ -342,12 +342,12 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center mb-4">
                     <div className="text-sm text-gray-600">
                       Total Volume: ${chartData.reduce((sum, item) => sum + (item.volume || 0), 0).toLocaleString()}
-                    </div>
+                </div>
                     <div className="text-sm text-gray-600">
                       {chartData.length} days
-                    </div>
-                  </div>
-                  
+              </div>
+            </div>
+            
                   {/* Simple Bar Chart */}
                   <div className="flex-1 flex items-end justify-between space-x-1 px-2">
                     {chartData.map((item, index) => {

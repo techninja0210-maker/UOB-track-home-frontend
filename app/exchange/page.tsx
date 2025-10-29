@@ -289,6 +289,9 @@ export default function ExchangePage() {
               <Link href="/exchange" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
                 Exchange
               </Link>
+              <Link href="/ai-trading" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+                AI Trading
+              </Link>
             </div>
 
             {/* User Profile */}
@@ -382,6 +385,9 @@ export default function ExchangePage() {
             </Link>
             <Link href="/exchange" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
               Exchange
+            </Link>
+            <Link href="/ai-trading" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              AI Trading
             </Link>
           </div>
         </div>

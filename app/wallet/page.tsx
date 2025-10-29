@@ -435,7 +435,10 @@ export default function WalletPage() {
               <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
                 Exchange
           </Link>
-      </div>
+              <Link href="/ai-trading" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                AI Trading
+          </Link>
+            </div>
 
             {/* User Profile */}
             <div className="relative user-profile">
@@ -460,7 +463,7 @@ export default function WalletPage() {
                   <div className="py-1">
                     <div className="px-4 py-2 text-sm text-gray-500">
                       User: {user?.role}
-                    </div>
+                  </div>
                   </div>
                   <div className="border-t border-gray-200 py-1">
                     <Link
@@ -473,7 +476,7 @@ export default function WalletPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                         Referral Program
-                      </div>
+                  </div>
                     </Link>
                     <Link
                       href="/account-settings"
@@ -486,7 +489,7 @@ export default function WalletPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         Account Settings
-                      </div>
+                </div>
                     </Link>
                     <button
                       onClick={logout}
@@ -497,14 +500,14 @@ export default function WalletPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
                         Sign out
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
+                    </button>
           </div>
         </div>
+              )}
+              </div>
+              </div>
+              </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -512,7 +515,7 @@ export default function WalletPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Wallet</h1>
           <p className="text-gray-600 mt-2">Manage your cryptocurrency balances and transactions</p>
-            </div>
+              </div>
 
         {/* Balance Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

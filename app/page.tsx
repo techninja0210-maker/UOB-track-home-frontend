@@ -104,6 +104,7 @@ export default function Dashboard() {
     ETH: 2000,
     USDT: 1
   });
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date>(new Date());
   // Fixed top-right toast (3s)
   const [topToast, setTopToast] = useState<{ text: string; type: 'warning' | 'error' | 'success' } | null>(null);
   const showTopToast = (text: string, type: 'warning' | 'error' | 'success' = 'warning') => {
@@ -180,8 +181,24 @@ export default function Dashboard() {
       // Load crypto prices first, then transactions (so USD calculations work)
       getCryptoPrices().then(prices => {
         setCryptoPrices(prices);
+        setLastPriceUpdate(new Date());
         loadTransactions(); // Load transactions after prices are set
       });
+    }
+  }, [user?.id]);
+
+  // Auto-refresh crypto prices every 30 seconds for real-time USD balance updates
+  useEffect(() => {
+    if (user?.id) {
+      const interval = setInterval(() => {
+        getCryptoPrices().then(prices => {
+          setCryptoPrices(prices);
+          setLastPriceUpdate(new Date());
+          console.log('🔄 Real-time crypto prices updated:', prices);
+        });
+      }, 30000); // Update every 30 seconds
+
+      return () => clearInterval(interval);
     }
   }, [user?.id]);
 
@@ -220,6 +237,7 @@ export default function Dashboard() {
       // Load crypto prices first, then transactions (so USD calculations work)
       const prices = await getCryptoPrices();
       setCryptoPrices(prices);
+      setLastPriceUpdate(new Date());
       await loadTransactions();
 
       // Load gold holdings (off-chain) and current gold price
@@ -864,6 +882,9 @@ export default function Dashboard() {
           <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
             Exchange
           </Link>
+          <Link href="/ai-trading" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
+            AI Trading
+          </Link>
             </div>
 
             {/* User Profile */}
@@ -958,6 +979,9 @@ export default function Dashboard() {
             <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
               Exchange
             </Link>
+            <Link href="/ai-trading" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
+              AI Trading
+            </Link>
           </div>
         </div>
       </nav>
@@ -977,6 +1001,9 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Portfolio</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPortfolioValue)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Live prices • Updated {lastPriceUpdate.toLocaleTimeString()}
+                </p>
               </div>
               <div className="h-12 w-12 bg-primary-50 rounded-lg flex items-center justify-center">
                 <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -993,6 +1020,7 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-gray-600">BTC Balance</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.BTC)}</p>
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.BTC * cryptoPrices.BTC)}</p>
+                <p className="text-xs text-green-600 mt-1">● Live</p>
               </div>
               <div className="h-12 w-12 bg-orange-50 rounded-lg flex items-center justify-center">
                 <span className="text-orange-600 font-bold text-lg">₿</span>
@@ -1007,6 +1035,7 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-gray-600">ETH Balance</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.ETH)}</p>
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.ETH * cryptoPrices.ETH)}</p>
+                <p className="text-xs text-green-600 mt-1">● Live</p>
               </div>
               <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <span className="text-blue-600 font-bold text-lg">Ξ</span>
@@ -1021,6 +1050,7 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-gray-600">USDT Balance</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.USDT)}</p>
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.USDT * cryptoPrices.USDT)}</p>
+                <p className="text-xs text-green-600 mt-1">● Live</p>
               </div>
               <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <span className="text-green-600 font-bold text-lg">₮</span>
