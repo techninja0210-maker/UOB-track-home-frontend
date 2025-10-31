@@ -6,6 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatCrypto, formatCompact } from '@/lib/formatters';
+// Coming soon modal not used
 
 interface User {
   id: number;
@@ -784,6 +785,7 @@ export default function WalletPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }

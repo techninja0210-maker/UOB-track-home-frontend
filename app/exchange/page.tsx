@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatCrypto, formatCompact } from '@/lib/formatters';
+// Coming soon modal not used
 import api from '@/lib/api';
 
 interface User {
@@ -631,6 +632,7 @@ export default function ExchangePage() {
           </button>
         </div>
       </div>
+
     </div>
   );
 }

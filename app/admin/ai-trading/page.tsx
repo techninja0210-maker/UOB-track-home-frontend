@@ -21,6 +21,10 @@ interface TradingBot {
   winning_trades: number;
   total_pnl: number;
   daily_pnl: number;
+  user_id?: string;
+  user_email?: string;
+  user_name?: string;
+  user_role?: string;
 }
 
 interface BotStats {
@@ -63,7 +67,8 @@ export default function AdminAITradingPage() {
       }
       setError('');
       
-      const response = await api.get('/api/ai-trading/bots');
+      // Use admin endpoint to get all bots with user information
+      const response = await api.get('/api/ai-trading/admin/bots');
       
       if (response.data.success) {
         setBots(response.data.bots);
@@ -317,10 +322,23 @@ export default function AdminAITradingPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="text-sm font-medium text-gray-900 truncate">
-                            {bot.name}
-                          </h4>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">
+                              {bot.name}
+                            </h4>
+                            {bot.user_email && (
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                                {bot.user_name || bot.user_email}
+                              </span>
+                            )}
+                          </div>
                           <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                            {bot.user_email && (
+                              <>
+                                <span className="text-blue-600 font-medium">{bot.user_email}</span>
+                                <span>•</span>
+                              </>
+                            )}
                             <span>Strategy: {bot.strategy_type}</span>
                             <span>•</span>
                             <span>Exchange: {bot.exchange}</span>
@@ -339,7 +357,16 @@ export default function AdminAITradingPage() {
                         </div>
                       </div>
                       
-                      <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                        {bot.user_email && (
+                          <div className="md:col-span-1">
+                            <span className="text-gray-500">Owner:</span>
+                            <div className="mt-0.5">
+                              <span className="font-medium text-blue-600">{bot.user_name || 'Unknown'}</span>
+                              <div className="text-xs text-gray-400">{bot.user_email}</div>
+                            </div>
+                          </div>
+                        )}
                         <div>
                           <span className="text-gray-500">Trades:</span>
                           <span className="ml-1 font-medium">{bot.total_trades}</span>
@@ -368,6 +395,9 @@ export default function AdminAITradingPage() {
                         Created: {formatDate(bot.created_at)}
                         {bot.last_run_at && (
                           <span className="ml-4">Last Run: {formatDate(bot.last_run_at)}</span>
+                        )}
+                        {bot.user_id && (
+                          <span className="ml-4">User ID: {bot.user_id}</span>
                         )}
                       </div>
                     </div>

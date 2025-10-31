@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// Get API URL from environment variable
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// Get API URL from environment variable (root only)
+let API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+// If someone set NEXT_PUBLIC_API_URL to include '/api' or '/api/', strip it to keep root only
+API_URL = API_URL.replace(/\/api\/?$/, '');
 
 // Create axios instance with base URL
 export const api = axios.create({

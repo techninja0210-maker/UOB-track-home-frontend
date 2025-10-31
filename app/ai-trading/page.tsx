@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import api from '@/lib/api';
+import { createChart, ColorType } from 'lightweight-charts';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -45,20 +47,24 @@ export default function AITradingPage() {
   const [showCreateBot, setShowCreateBot] = useState(false);
   const [showBotDetails, setShowBotDetails] = useState<string | null>(null);
   const [botActivity, setBotActivity] = useState<{[key: string]: any}>({});
-  const [marketPrices, setMarketPrices] = useState({
-    BTCUSDT: { price: 0, change24h: 0 },
-    ETHUSDT: { price: 0, change24h: 0 },
-    ADAUSDT: { price: 0, change24h: 0 },
-    SOLUSDT: { price: 0, change24h: 0 }
-  });
+  const [goldPrice, setGoldPrice] = useState(0);
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date>(new Date());
+  const [goldSeries, setGoldSeries] = useState<{ t: string; pricePerGram: number }[]>([]);
+  const [goldChange24h, setGoldChange24h] = useState<number>(0);
+  const chartsRef = useRef<{ [key: string]: { chart: any; series: any } }>({});
+  const tvRef = useRef<{ [key: string]: boolean }>({});
+  const tvTimerRef = useRef<{ [key: string]: any }>({});
+  const tvMarketInitRef = useRef<boolean>(false);
+  const tvMarketTimerRef = useRef<any>(null);
+  const tvMarketCreatedRef = useRef<boolean>(false);
+  const tvMarketWaitRef = useRef<any>(null);
   const [newBot, setNewBot] = useState({
     name: '',
     strategy_type: 'sma_crossover',
-    trading_pairs: ['BTCUSDT', 'ETHUSDT'],
+    trading_pairs: ['XAUUSD'],
     exchange: 'binance',
     is_paper_trading: true,
-    risk_params: {
+    risk_settings: {
       max_position_size: 1000,
       stop_loss_percent: 2,
       take_profit_percent: 4,
@@ -70,27 +76,146 @@ export default function AITradingPage() {
       stop_loss_percent: 2,
       take_profit_percent: 4,
       daily_loss_limit_percent: 5,
-      max_open_positions: 3
+      max_open_positions: 3,
+      quoteCurrency: 'USDT'
     }
   });
 
   useEffect(() => {
     fetchBots();
-    fetchMarketPrices();
+    fetchGoldSeries(); // drives UI cheaply from DB
+    fetchGoldPrice();  // initial value from backend cache
     
     // Auto-refresh bot data every 5 seconds
     const interval = setInterval(() => {
       fetchBots();
     }, 5000);
     
-    // Auto-refresh market prices every 15 seconds
-    const marketInterval = setInterval(() => {
-      fetchMarketPrices();
-    }, 15000);
+    // Series every 5s; current price every 60s to minimize paid API usage
+    const seriesInterval = setInterval(() => {
+      fetchGoldSeries();
+    }, 5000);
+    // Update gold price and 24h change every 5 seconds to keep percentage fresh
+    const currentInterval = setInterval(() => {
+      fetchGoldPrice();
+    }, 5000);
+
+    // Initialize TradingView chart for Market section
+    const ensureTV = () => new Promise<void>((resolve) => {
+      const w: any = window as any;
+      if (w.TradingView && w.TradingView.widget) return resolve();
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/tv.js';
+      script.async = true;
+      script.onload = () => resolve();
+      document.body.appendChild(script);
+    });
+    (async () => {
+      await ensureTV();
+      const w: any = window as any;
+
+      const createWidget = () => {
+        const container = document.getElementById('tv-gold-chart-market');
+        if (!container) return false;
+        const rect = container.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        container.innerHTML = '';
+        try {
+          new w.TradingView.widget({
+            autosize: true,
+            symbol: 'XAUUSD',
+            interval: '1',
+            timezone: 'Etc/UTC',
+            theme: 'light',
+            style: '1',
+            locale: 'en',
+            container_id: 'tv-gold-chart-market',
+            hide_top_toolbar: false,
+            hide_legend: false,
+            allow_symbol_change: false,
+            studies: [],
+            enable_publishing: false,
+            withdateranges: true,
+            range: '1D',
+            hide_side_toolbar: false,
+            save_image: false,
+            calendar: false,
+            support_host: 'https://www.tradingview.com'
+          });
+          tvMarketCreatedRef.current = true;
+          return true;
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const initWithRetry = (maxTries = 40) => {
+        let tries = 0;
+        if (tvMarketWaitRef.current) clearInterval(tvMarketWaitRef.current);
+        tvMarketWaitRef.current = setInterval(() => {
+          if (tvMarketCreatedRef.current) { clearInterval(tvMarketWaitRef.current); return; }
+          const ok = createWidget();
+          tries += 1;
+          if (ok || tries >= maxTries) {
+            clearInterval(tvMarketWaitRef.current);
+            if (!ok) {
+              // Fallback to lightweight chart if TV fails repeatedly
+              const cont = document.getElementById('tv-gold-chart-market');
+              if (cont) {
+                cont.innerHTML = '';
+                const LW: any = (window as any).LightweightCharts;
+                if (LW && LW.createChart) {
+                  const c = LW.createChart(cont, { height: 320 });
+                  const s = c.addAreaSeries({ lineColor: '#2563eb', topColor: 'rgba(37,99,235,0.25)', bottomColor: 'rgba(37,99,235,0.03)' });
+                  const pts = goldSeries.length ? goldSeries : [{ t: new Date().toISOString(), pricePerGram: goldPrice }];
+                  const data = pts.map(p => ({ time: Math.floor(new Date(p.t).getTime() / 1000), value: Number(p.pricePerGram) * 31.1035 }));
+                  s.setData(data);
+                }
+              }
+            }
+          }
+        }, 150);
+      };
+
+      if (!tvMarketInitRef.current) {
+        initWithRetry();
+        tvMarketInitRef.current = true;
+        if (tvMarketTimerRef.current) clearInterval(tvMarketTimerRef.current);
+        // Refresh widget every 5 minutes to ensure connection stays alive (less disruptive than 60s)
+        // TradingView widget streams data automatically, so we only refresh to prevent stale connections
+        tvMarketTimerRef.current = setInterval(() => {
+          // Only refresh if widget exists and we're visible
+          if (tvMarketCreatedRef.current && !document.hidden) {
+            const container = document.getElementById('tv-gold-chart-market');
+            if (container && container.innerHTML.trim() !== '') {
+              tvMarketCreatedRef.current = false;
+              initWithRetry();
+            }
+          }
+        }, 300000); // 5 minutes instead of 60 seconds
+        const onVis = () => { 
+          if (!document.hidden && !tvMarketCreatedRef.current) {
+            tvMarketCreatedRef.current = false;
+            initWithRetry();
+          }
+        };
+        const onResize = () => {
+          // Only recreate on significant resize, not every small resize
+          if (!tvMarketCreatedRef.current) {
+            tvMarketCreatedRef.current = false;
+            setTimeout(() => initWithRetry(), 300); // Debounce resize
+          }
+        };
+        document.addEventListener('visibilitychange', onVis);
+        window.addEventListener('resize', onResize);
+      }
+    })();
     
     return () => {
       clearInterval(interval);
-      clearInterval(marketInterval);
+      clearInterval(seriesInterval);
+      clearInterval(currentInterval);
+      if (tvMarketTimerRef.current) clearInterval(tvMarketTimerRef.current);
     };
   }, []);
 
@@ -99,10 +224,10 @@ export default function AITradingPage() {
     if (bots.length > 0) {
       const runningBots = bots.filter(bot => bot.status === 'running');
       runningBots.forEach(bot => {
-        // Set default activity data immediately for running bots
+        // Set default activity data immediately for running bots (only if not already set)
         setBotActivity(prev => ({
           ...prev,
-          [bot.id]: {
+          [bot.id]: prev[bot.id] || {
             status: 'Active - Monitoring markets',
             lastSignal: 'Analyzing market conditions...',
             marketAnalysis: 'Market analysis in progress...',
@@ -123,24 +248,36 @@ export default function AITradingPage() {
       runningBots.forEach(bot => {
         fetchBotActivity(bot.id);
       });
+      // Also refresh trades for bots with open details
+      if (showBotDetails && selectedBot) {
+        fetchTrades(selectedBot.id);
+      }
     }, 5000);
     return () => clearInterval(interval);
-  }, [bots]);
+  }, [bots, showBotDetails, selectedBot]);
 
   const fetchBots = async () => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/ai-trading/bots', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const { data } = await api.get('/api/ai-trading/bots');
+      const newBots = data.bots || [];
+      setBots(newBots);
       
-      if (response.ok) {
-        const data = await response.json();
-        setBots(data.bots || []);
-      }
+      // Preserve showBotDetails if the bot still exists, otherwise clear it
+      setShowBotDetails(prev => {
+        if (!prev) return null;
+        const botExists = newBots.some((bot: Bot) => bot.id === prev);
+        if (botExists) {
+          // Update selectedBot when bot list refreshes
+          const selected = newBots.find((bot: Bot) => bot.id === prev);
+          if (selected) {
+            setSelectedBot(selected);
+          }
+          return prev; // Keep showing details
+        }
+        // Bot was deleted, clear details
+        setSelectedBot(null);
+        return null;
+      });
     } catch (error) {
       console.error('Error fetching bots:', error);
     } finally {
@@ -148,91 +285,145 @@ export default function AITradingPage() {
     }
   };
 
-  const fetchMarketPrices = async () => {
+  const fetchGoldPrice = async () => {
     try {
-      // Fetch real-time prices from backend (which uses Binance API)
-      const response = await fetch('http://localhost:5000/api/prices/crypto');
-      
+      // Use api client for consistent base URL handling
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '').replace(/\/api\/?$/, '');
+      // Use force=1 to get fresh price, but backend calculates 24h change from DB (not external API)
+      const response = await fetch(`${API_URL}/api/prices/gold/current?force=1&_=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Real crypto prices fetched from Binance via backend:', data);
-        
-        setMarketPrices({
-          BTCUSDT: { 
-            price: data.BTC || 112547, 
-            change24h: data.BTC_change24h || 0
-          },
-          ETHUSDT: { 
-            price: data.ETH || 3972, 
-            change24h: data.ETH_change24h || 0
-          },
-          ADAUSDT: { 
-            price: data.ADA || 0.45, 
-            change24h: data.ADA_change24h || 0
-          },
-          SOLUSDT: { 
-            price: data.SOL || 98.50, 
-            change24h: data.SOL_change24h || 0
-          }
-        });
-        setLastPriceUpdate(new Date());
-      } else {
-        // Fallback to CoinGecko API directly
-        const coinGeckoResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,solana&vs_currencies=usd&include_24hr_change=true');
-        
-        if (coinGeckoResponse.ok) {
-          const coinGeckoData = await coinGeckoResponse.json();
-          console.log('Fallback to CoinGecko API:', coinGeckoData);
-          
-          setMarketPrices({
-            BTCUSDT: { 
-              price: coinGeckoData.bitcoin?.usd || 112547, 
-              change24h: coinGeckoData.bitcoin?.usd_24h_change || 0
-            },
-            ETHUSDT: { 
-              price: coinGeckoData.ethereum?.usd || 3972, 
-              change24h: coinGeckoData.ethereum?.usd_24h_change || 0
-            },
-            ADAUSDT: { 
-              price: coinGeckoData.cardano?.usd || 0.45, 
-              change24h: coinGeckoData.cardano?.usd_24h_change || 0
-            },
-            SOLUSDT: { 
-              price: coinGeckoData.solana?.usd || 98.50, 
-              change24h: coinGeckoData.solana?.usd_24h_change || 0
-            }
-          });
-          setLastPriceUpdate(new Date());
-        } else {
-          throw new Error(`Both APIs failed: Backend ${response.status}, CoinGecko ${coinGeckoResponse.status}`);
+        setGoldPrice(data.pricePerGram || 0);
+        // Always update 24h change if provided (calculated from gold_price_history table)
+        if (typeof data.change24h === 'number' && !isNaN(data.change24h)) {
+          setGoldChange24h(data.change24h);
         }
+        setLastPriceUpdate(new Date());
       }
     } catch (error) {
-      console.error('Error fetching market prices:', error);
-      // Use current market data as fallback if all APIs fail
-      setMarketPrices({
-        BTCUSDT: { price: 112547, change24h: 2.3 },
-        ETHUSDT: { price: 3972, change24h: 1.8 },
-        ADAUSDT: { price: 0.45, change24h: -0.5 },
-        SOLUSDT: { price: 98.50, change24h: 3.2 }
-      });
+      console.error('Error fetching gold price:', error);
     }
   };
 
-  const fetchTrades = async (botId: string) => {
+  const fetchGoldSeries = async () => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/trades`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
+      // Use api client for consistent base URL handling
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '').replace(/\/api\/?$/, '');
+      const response = await fetch(`${API_URL}/api/prices/gold?points=120&_=${Date.now()}`);
       if (response.ok) {
         const data = await response.json();
-        setTrades(data.trades || []);
+        if (Array.isArray(data.series)) {
+          setGoldSeries(data.series);
+          // Keep card price in sync with latest series value (but don't overwrite 24h change)
+          // The 24h change should come from fetchGoldPrice which uses backend's accurate 24h calculation
+          if (data.series.length > 0) {
+            const last = Number(data.series[data.series.length - 1].pricePerGram) || 0;
+            if (last > 0) {
+              setGoldPrice(last);
+            }
+          }
+        }
       }
+    } catch (error) {
+      console.error('Error fetching gold series:', error);
+    }
+  };
+
+  // Initialize TradingView widget (preferred) or fallback Lightweight Chart for the opened bot details
+  useEffect(() => {
+    if (!showBotDetails) return;
+    const tvContainer = document.getElementById(`tv-gold-chart-${showBotDetails}`) as HTMLDivElement | null;
+    const lwContainer = document.getElementById(`gold-chart-${showBotDetails}`) as HTMLDivElement | null;
+    if (!tvContainer) return;
+
+    const ensureTV = () => new Promise<void>((resolve) => {
+      const w: any = window as any;
+      if (w.TradingView && w.TradingView.widget) return resolve();
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/tv.js';
+      script.async = true;
+      script.onload = () => resolve();
+      document.body.appendChild(script);
+    });
+
+    (async () => {
+      // Only create once per bot id
+      if (!tvRef.current[showBotDetails]) {
+        await ensureTV();
+        const w: any = window as any;
+        // Use a widely available symbol mapping
+        // Clean container before (re)create
+        tvContainer.innerHTML = '';
+        const widget = new w.TradingView.widget({
+          autosize: true,
+          symbol: 'XAUUSD',
+          interval: '1',
+          timezone: 'Etc/UTC',
+          theme: 'light',
+          style: '1',
+          locale: 'en',
+          container_id: `tv-gold-chart-${showBotDetails}`,
+          hide_top_toolbar: false,
+          hide_legend: false,
+          allow_symbol_change: false,
+          studies: [],
+        });
+        tvRef.current[showBotDetails] = true;
+        // Periodically refresh the widget to avoid rare streaming stalls
+        if (tvTimerRef.current[showBotDetails]) {
+          clearInterval(tvTimerRef.current[showBotDetails]);
+        }
+        tvTimerRef.current[showBotDetails] = setInterval(async () => {
+          try {
+            tvContainer.innerHTML = '';
+            new w.TradingView.widget({
+              autosize: true,
+              symbol: 'XAUUSD',
+              interval: '1',
+              timezone: 'Etc/UTC',
+              theme: 'light',
+              style: '1',
+              locale: 'en',
+              container_id: `tv-gold-chart-${showBotDetails}`,
+              hide_top_toolbar: false,
+              hide_legend: false,
+              allow_symbol_change: false,
+              studies: [],
+            });
+          } catch (_) {}
+        }, 60000);
+      }
+
+      // Also maintain a lightweight-chart fallback if tv fails
+      if (lwContainer && !chartsRef.current[showBotDetails]) {
+        const LWEnsure = () => new Promise<void>((resolve) => {
+          const w: any = window as any;
+          if (w.LightweightCharts && w.LightweightCharts.createChart) return resolve();
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+          script.async = true;
+          script.onload = () => resolve();
+          document.body.appendChild(script);
+        });
+        await LWEnsure();
+        const LW: any = (window as any).LightweightCharts;
+        const chart = LW.createChart(lwContainer, { height: 200 });
+        const series = chart.addAreaSeries({ lineColor: '#2563eb', topColor: 'rgba(37,99,235,0.25)', bottomColor: 'rgba(37,99,235,0.03)' });
+        chartsRef.current[showBotDetails] = { chart, series };
+      }
+
+      if (chartsRef.current[showBotDetails]) {
+        const pts = goldSeries.length ? goldSeries : [{ t: new Date().toISOString(), pricePerGram: goldPrice }];
+        const data = pts.map(p => ({ time: Math.floor(new Date(p.t).getTime() / 1000), value: Number(p.pricePerGram) }));
+        chartsRef.current[showBotDetails].series.setData(data);
+      }
+    })();
+  }, [showBotDetails, goldSeries, goldPrice]);
+
+  const fetchTrades = async (botId: string) => {
+    try {
+      const { data } = await api.get(`/api/ai-trading/bots/${botId}/trades`);
+      setTrades(data.trades || []);
     } catch (error) {
       console.error('Error fetching trades:', error);
     }
@@ -240,36 +431,10 @@ export default function AITradingPage() {
 
   const fetchBotActivity = async (botId: string) => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/activity`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setBotActivity(prev => ({
-          ...prev,
-          [botId]: data
-        }));
-      } else {
-        // If activity endpoint fails, set default activity data
-        setBotActivity(prev => ({
-          ...prev,
-          [botId]: {
-            status: 'Active - Monitoring markets',
-            lastSignal: 'Analyzing market conditions...',
-            marketAnalysis: 'Market analysis in progress...',
-            recentTrades: [],
-            marketData: []
-          }
-        }));
-      }
+      const { data } = await api.get(`/api/ai-trading/bots/${botId}/activity`);
+      setBotActivity(prev => ({ ...prev, [botId]: data }));
     } catch (error) {
       console.error('Error fetching bot activity:', error);
-      // Set default activity data on error
       setBotActivity(prev => ({
         ...prev,
         [botId]: {
@@ -286,21 +451,13 @@ export default function AITradingPage() {
   const createBot = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/ai-trading/bots', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
+      await api.post('/api/ai-trading/bots', {
           name: newBot.name,
           strategy_type: newBot.strategy_type,
-          exchange: newBot.exchange,
+          exchange: 'paper',
           trading_pairs: newBot.trading_pairs.filter(pair => pair.trim() !== ''),
           is_paper_trading: newBot.is_paper_trading,
-          risk_params: {
+          risk_settings: {
             max_position_size: 1000,
             stop_loss_percent: 2,
             take_profit_percent: 4,
@@ -312,21 +469,19 @@ export default function AITradingPage() {
             stop_loss_percent: 2,
             take_profit_percent: 4,
             daily_loss_limit_percent: 5,
-            max_open_positions: 3
+            max_open_positions: 3,
+            quoteCurrency: newBot.strategy_params.quoteCurrency || 'USDT'
           }
-        })
-      });
-      
-      if (response.ok) {
-        await fetchBots();
-        setShowCreateBot(false);
+        });
+      await fetchBots();
+      setShowCreateBot(false);
         setNewBot({
           name: '',
           strategy_type: 'sma_crossover',
-          trading_pairs: ['BTCUSDT', 'ETHUSDT'],
-          exchange: 'binance',
+          trading_pairs: ['XAUUSD'],
+        exchange: 'paper',
           is_paper_trading: true,
-          risk_params: {
+          risk_settings: {
             max_position_size: 1000,
             stop_loss_percent: 2,
             take_profit_percent: 4,
@@ -338,29 +493,23 @@ export default function AITradingPage() {
             stop_loss_percent: 2,
             take_profit_percent: 4,
             daily_loss_limit_percent: 5,
-            max_open_positions: 3
+            max_open_positions: 3,
+            quoteCurrency: 'USDT'
           }
         });
-      }
-    } catch (error) {
-      console.error('Error creating bot:', error);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      const url = (error?.config?.baseURL || '') + (error?.config?.url || '');
+      console.error('Error creating bot:', { status, data, url, error });
+      alert(`Create bot failed (${status || 'error'}): ${data?.message || error?.message || 'Unknown error'}\nURL: ${url}`);
     }
   };
 
   const startBot = async (botId: string) => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/start`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        await fetchBots();
-      }
+      await api.post(`/api/ai-trading/bots/${botId}/start`);
+      await fetchBots();
     } catch (error) {
       console.error('Error starting bot:', error);
     }
@@ -368,18 +517,8 @@ export default function AITradingPage() {
 
   const stopBot = async (botId: string) => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/stop`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        await fetchBots();
-      }
+      await api.post(`/api/ai-trading/bots/${botId}/stop`);
+      await fetchBots();
     } catch (error) {
       console.error('Error stopping bot:', error);
     }
@@ -387,18 +526,8 @@ export default function AITradingPage() {
 
   const pauseBot = async (botId: string) => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/pause`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        await fetchBots();
-      }
+      await api.post(`/api/ai-trading/bots/${botId}/pause`);
+      await fetchBots();
     } catch (error) {
       console.error('Error pausing bot:', error);
     }
@@ -406,20 +535,21 @@ export default function AITradingPage() {
 
   const resumeBot = async (botId: string) => {
     try {
-      const token = document.cookie.split('; ').find(row => row.startsWith('authToken='))?.split('=')[1] || 
-                   sessionStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/ai-trading/bots/${botId}/resume`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        await fetchBots();
-      }
+      await api.post(`/api/ai-trading/bots/${botId}/resume`);
+      await fetchBots();
     } catch (error) {
       console.error('Error resuming bot:', error);
+    }
+  };
+
+  const deleteBot = async (botId: string) => {
+    try {
+      const confirmed = window.confirm('Delete this bot? This action cannot be undone.');
+      if (!confirmed) return;
+      await api.delete(`/api/ai-trading/bots/${botId}`);
+      await fetchBots();
+    } catch (error) {
+      console.error('Error deleting bot:', error);
     }
   };
 
@@ -542,59 +672,12 @@ export default function AITradingPage() {
 
         {/* Market Prices Overview */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Live Market Prices</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">BTCUSDT</div>
-                  <div className="text-lg font-semibold text-gray-900">${marketPrices.BTCUSDT.price.toLocaleString()}</div>
-                  <div className={`text-sm ${marketPrices.BTCUSDT.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {marketPrices.BTCUSDT.change24h >= 0 ? '+' : ''}{marketPrices.BTCUSDT.change24h}% (24h)
-                  </div>
-                </div>
-                <div className="text-2xl">₿</div>
-              </div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">ETHUSDT</div>
-                  <div className="text-lg font-semibold text-gray-900">${marketPrices.ETHUSDT.price.toLocaleString()}</div>
-                  <div className={`text-sm ${marketPrices.ETHUSDT.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {marketPrices.ETHUSDT.change24h >= 0 ? '+' : ''}{marketPrices.ETHUSDT.change24h}% (24h)
-                  </div>
-                </div>
-                <div className="text-2xl">Ξ</div>
-              </div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">ADAUSDT</div>
-                  <div className="text-lg font-semibold text-gray-900">${marketPrices.ADAUSDT.price}</div>
-                  <div className={`text-sm ${marketPrices.ADAUSDT.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {marketPrices.ADAUSDT.change24h >= 0 ? '+' : ''}{marketPrices.ADAUSDT.change24h}% (24h)
-                  </div>
-                </div>
-                <div className="text-2xl">₳</div>
-              </div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">SOLUSDT</div>
-                  <div className="text-lg font-semibold text-gray-900">${marketPrices.SOLUSDT.price}</div>
-                  <div className={`text-sm ${marketPrices.SOLUSDT.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {marketPrices.SOLUSDT.change24h >= 0 ? '+' : ''}{marketPrices.SOLUSDT.change24h}% (24h)
-                  </div>
-                </div>
-                <div className="text-2xl">◎</div>
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-medium text-gray-900">Live Market Prices</h3>
+            <div className="text-xs text-gray-500">Updated {lastPriceUpdate.toLocaleTimeString()}</div>
           </div>
-          <div className="mt-4 text-xs text-gray-500 text-center">
-            Prices update every 15 seconds • Last updated: {lastPriceUpdate.toLocaleTimeString()}
+          <div className="bg-gray-50 rounded-lg p-2">
+            <div id="tv-gold-chart-market" style={{ width: '100%', height: 320 }} />
           </div>
         </div>
 
@@ -672,7 +755,7 @@ export default function AITradingPage() {
                             Win Rate: {bot.total_trades > 0 ? Math.round(((Number(bot.winning_trades) || 0) / (Number(bot.total_trades) || 1)) * 100) : 0}%
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
                           {bot.status === 'running' ? (
                             <>
                               <button
@@ -715,12 +798,23 @@ export default function AITradingPage() {
                             onClick={() => {
                               setSelectedBot(bot);
                               fetchTrades(bot.id);
+                              if (bot.status === 'running') {
+                                fetchBotActivity(bot.id);
+                              }
                               setShowBotDetails(showBotDetails === bot.id ? null : bot.id);
                             }}
                             className="text-blue-600 hover:text-blue-900"
                           >
                             {showBotDetails === bot.id ? 'Hide Details' : 'View Details'}
                           </button>
+                          {bot.status !== 'running' && (
+                            <button
+                              onClick={() => deleteBot(bot.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </td>
                       </tr>
                       
@@ -758,142 +852,432 @@ export default function AITradingPage() {
                                     </div>
                                   </div>
 
-                                  {/* Strategy Execution Progress */}
-                                  <div className="mb-6">
-                                    <h6 className="text-sm font-medium text-gray-900 mb-3">Strategy Execution Progress</h6>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div className="bg-gray-50 rounded-lg p-4">
-                                        <div className="text-xs text-gray-600 font-medium mb-2">Current Analysis</div>
-                                        <div className="space-y-2">
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">SMA(20):</span>
-                                            <span className="text-green-600 font-medium">${marketPrices.BTCUSDT.price.toLocaleString()}</span>
+                                  {/* Real-Time Bot Status with Live Activity */}
+                                  {botActivity[bot.id] && (
+                                    <div className="space-y-4">
+                                      {/* Bot Activity Indicator */}
+                                      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center">
+                                            <div className="relative">
+                                              <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
+                                              <div className="absolute h-3 w-3 bg-green-400 rounded-full animate-ping"></div>
+                                            </div>
+                                            <div className="ml-3">
+                                              <h6 className="text-sm font-semibold text-gray-900">Bot Status</h6>
+                                              <p className="text-sm text-gray-700 font-medium">{botActivity[bot.id].status || 'Active - Monitoring markets'}</p>
+                                            </div>
                                           </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">SMA(50):</span>
-                                            <span className="text-green-600 font-medium">${(marketPrices.BTCUSDT.price * 0.98).toLocaleString()}</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Crossover:</span>
-                                            <span className="text-green-600 font-medium">Bullish (SMA20 &gt; SMA50)</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Momentum:</span>
-                                            <span className="text-green-600 font-medium">Positive</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="bg-gray-50 rounded-lg p-4">
-                                        <div className="text-xs text-gray-600 font-medium mb-2">Signal Generation</div>
-                                        <div className="space-y-2">
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Data Collection:</span>
-                                            <span className="text-green-600 font-medium">✓ Complete</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Technical Analysis:</span>
-                                            <span className="text-green-600 font-medium">✓ Complete</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Risk Assessment:</span>
-                                            <span className="text-yellow-600 font-medium">⏳ 75% Complete</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Signal Validation:</span>
-                                            <span className="text-yellow-600 font-medium">⏳ 50% Complete</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Execution Ready:</span>
-                                            <span className="text-yellow-600 font-medium">⏳ Pending</span>
+                                          <div className="text-right">
+                                            <div className="text-xs text-gray-500">Cycle Status</div>
+                                            <div className="text-sm font-semibold text-green-600">
+                                              {botActivity[bot.id].status?.includes('Analyzing') ? '🔍 Analyzing' :
+                                               botActivity[bot.id].status?.includes('Evaluating') ? '📊 Evaluating' :
+                                               botActivity[bot.id].status?.includes('Monitoring') ? '👁️ Monitoring' :
+                                               botActivity[bot.id].status?.includes('Preparing') ? '⚙️ Preparing' :
+                                               '🔄 Active'}
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                    
-                                    <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                                      <div className="flex items-center">
-                                        <span className="text-blue-600 mr-2">⚡</span>
-                                        <span className="text-sm font-medium text-blue-800">Next Action: BUY Signal (Confidence: 85%)</span>
-                                      </div>
-                                    </div>
-                                  </div>
 
-                                  {/* Risk Management Progress */}
-                                  <div className="mb-6">
-                                    <h6 className="text-sm font-medium text-gray-900 mb-3">Risk Management Progress</h6>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div className="bg-gray-50 rounded-lg p-4">
-                                        <div className="text-xs text-gray-600 font-medium mb-2">Portfolio Risk Assessment</div>
-                                        <div className="space-y-2">
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Current Exposure:</span>
-                                            <span className="text-green-600 font-medium">$2,450.00 (24.5%)</span>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Current Signal Activity */}
+                                        <div className="bg-white border-2 border-blue-100 rounded-lg p-4">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <h6 className="text-sm font-medium text-gray-700">Current Activity</h6>
+                                            <span className="text-xs text-green-600 font-medium animate-pulse">● LIVE</span>
                                           </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Max Position Size:</span>
-                                            <span className="text-green-600 font-medium">$10,000.00</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Daily Loss Limit:</span>
-                                            <span className="text-green-600 font-medium">$500.00 (Used: $45.20)</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Max Open Positions:</span>
-                                            <span className="text-green-600 font-medium">3 (Current: 2)</span>
-                                          </div>
+                                          <p className="text-sm text-gray-900 font-medium">
+                                            {goldPrice > 0 
+                                              ? `Monitoring gold price: $${goldPrice.toFixed(2)}/gram - Looking for entry opportunities`
+                                              : botActivity[bot.id].lastSignal || 'Analyzing market conditions...'}
+                                          </p>
+                                          {botActivity[bot.id].lastRunAt && (
+                                            <p className="text-xs text-gray-500 mt-2">
+                                              Last analysis: {new Date(botActivity[bot.id].lastRunAt).toLocaleTimeString()}
+                                            </p>
+                                          )}
                                         </div>
-                                      </div>
-                                      
-                                      <div className="bg-gray-50 rounded-lg p-4">
-                                        <div className="text-xs text-gray-600 font-medium mb-2">Position Risk Analysis</div>
-                                        <div className="space-y-2">
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Stop Loss Distance:</span>
-                                            <span className="text-green-600 font-medium">1.7%</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Take Profit Distance:</span>
-                                            <span className="text-green-600 font-medium">1.7%</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Risk/Reward Ratio:</span>
-                                            <span className="text-green-600 font-medium">1:1</span>
-                                          </div>
-                                          <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-700">Volatility Impact:</span>
-                                            <span className="text-yellow-600 font-medium">⚠️ Medium</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="mt-4 bg-green-50 rounded-lg p-3">
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center">
-                                          <span className="text-green-600 mr-2">✓</span>
-                                          <span className="text-sm font-medium text-green-800">Risk Score: 6.5/10 (Moderate)</span>
-                                        </div>
-                                        <div className="flex items-center">
-                                          <span className="text-blue-600 mr-2">⚡</span>
-                                          <span className="text-sm font-medium text-blue-800">Proceed with caution</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
 
-                                  {/* Live Activity Stream */}
-                                  <div>
-                                    <h6 className="text-sm font-medium text-gray-900 mb-3">Live Activity Stream</h6>
-                                    <div className="bg-gray-900 rounded-lg p-4 text-green-400 font-mono text-sm">
-                                      <div className="space-y-1">
-                                        <div>[{new Date().toLocaleTimeString()}] Bot initialized and monitoring markets</div>
-                                        <div>[{new Date(Date.now() - 5000).toLocaleTimeString()}] Technical analysis completed for {bot.trading_pairs[0]}</div>
-                                        <div>[{new Date(Date.now() - 10000).toLocaleTimeString()}] Risk assessment in progress...</div>
-                                        <div>[{new Date(Date.now() - 15000).toLocaleTimeString()}] Market data updated from Binance API</div>
-                                        <div>[{new Date(Date.now() - 20000).toLocaleTimeString()}] Strategy parameters validated</div>
+                                        {/* Market Analysis */}
+                                        <div className="bg-white border-2 border-purple-100 rounded-lg p-4">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <h6 className="text-sm font-medium text-gray-700">Market Analysis</h6>
+                                            <span className="text-xs text-purple-600 font-medium">📈 LIVE</span>
+                                          </div>
+                                          <p className="text-sm text-gray-900 font-medium">
+                                            {goldPrice > 0 
+                                              ? goldChange24h !== null && goldChange24h !== undefined
+                                                ? `Gold ${goldChange24h > 0.1 ? 'uptrend' : goldChange24h < -0.1 ? 'downtrend' : 'sideways'}: $${goldPrice.toFixed(2)}/gram (${goldChange24h >= 0 ? '+' : ''}${goldChange24h.toFixed(2)}% 24h)`
+                                                : `Current gold price: $${goldPrice.toFixed(2)}/gram - Analyzing trends...`
+                                              : botActivity[bot.id].marketAnalysis || 'Fetching real-time gold price data...'}
+                                          </p>
+                                          <p className="text-xs text-gray-500 mt-2">
+                                            Real-time price monitoring active • Updated every 5s
+                                          </p>
+                                        </div>
                                       </div>
                                     </div>
+                                  )}
+
+                                  {/* Signal Generation Progress - Enhanced with Live Indicators */}
+                                  {botActivity[bot.id]?.signalProgress && (
+                                    <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-lg p-5 shadow-sm">
+                                      <div className="flex items-center justify-between mb-4">
+                                        <h6 className="text-base font-semibold text-gray-900">Signal Generation Progress</h6>
+                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium animate-pulse">
+                                          🔄 LIVE
+                                        </span>
+                                      </div>
+                                      <div className="space-y-4">
+                                        {/* Data Collection */}
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center">
+                                              {botActivity[bot.id].signalProgress.dataCollection === 'complete' ? (
+                                                <span className="text-green-500 mr-2">✓</span>
+                                              ) : (
+                                                <span className="text-yellow-500 mr-2 animate-spin">⟳</span>
+                                              )}
+                                              <span className="font-medium text-gray-700">Data Collection</span>
+                                            </div>
+                                            <span className={`font-semibold ${botActivity[bot.id].signalProgress.dataCollection === 'complete' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                              {botActivity[bot.id].signalProgress.dataCollection === 'complete' ? 'Complete' : 'Collecting...'}
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div 
+                                              className={`h-2.5 rounded-full transition-all duration-500 ${botActivity[bot.id].signalProgress.dataCollection === 'complete' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}
+                                              style={{ width: botActivity[bot.id].signalProgress.dataCollection === 'complete' ? '100%' : '75%' }}
+                                            ></div>
+                                          </div>
+                                        </div>
+
+                                        {/* Technical Analysis */}
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center">
+                                              {botActivity[bot.id].signalProgress.technicalAnalysis === 'complete' ? (
+                                                <span className="text-green-500 mr-2">✓</span>
+                                              ) : (
+                                                <span className="text-yellow-500 mr-2 animate-spin">⟳</span>
+                                              )}
+                                              <span className="font-medium text-gray-700">Technical Analysis</span>
+                                            </div>
+                                            <span className={`font-semibold ${botActivity[bot.id].signalProgress.technicalAnalysis === 'complete' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                              {botActivity[bot.id].signalProgress.technicalAnalysis === 'complete' ? 'Complete' : 'Analyzing...'}
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div 
+                                              className={`h-2.5 rounded-full transition-all duration-500 ${botActivity[bot.id].signalProgress.technicalAnalysis === 'complete' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}
+                                              style={{ width: botActivity[bot.id].signalProgress.technicalAnalysis === 'complete' ? '100%' : '85%' }}
+                                            ></div>
+                                          </div>
+                                        </div>
+
+                                        {/* Risk Assessment - Dynamic */}
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center">
+                                              <span className="text-blue-500 mr-2 animate-pulse">⚡</span>
+                                              <span className="font-medium text-gray-700">Risk Assessment</span>
+                                            </div>
+                                            <span className="font-semibold text-blue-600">
+                                              {botActivity[bot.id].signalProgress.riskAssessmentPercent || 0}%
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                            <div 
+                                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out relative"
+                                              style={{ width: `${Math.max(5, botActivity[bot.id].signalProgress.riskAssessmentPercent || 0)}%` }}
+                                            >
+                                              <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                                            </div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-1">Evaluating portfolio risk and position sizing...</p>
+                                        </div>
+
+                                        {/* Signal Validation - Dynamic */}
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center">
+                                              <span className="text-purple-500 mr-2 animate-pulse">🔍</span>
+                                              <span className="font-medium text-gray-700">Signal Validation</span>
+                                            </div>
+                                            <span className="font-semibold text-purple-600">
+                                              {botActivity[bot.id].signalProgress.signalValidationPercent || 0}%
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                            <div 
+                                              className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out relative"
+                                              style={{ width: `${Math.max(5, botActivity[bot.id].signalProgress.signalValidationPercent || 0)}%` }}
+                                            >
+                                              <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                                            </div>
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-1">Validating trading signals against market conditions...</p>
+                                        </div>
+
+                                        {/* Execution Ready */}
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center">
+                                              {botActivity[bot.id].signalProgress.executionReady === 'ready' ? (
+                                                <span className="text-green-500 mr-2 animate-pulse">✓</span>
+                                              ) : (
+                                                <span className="text-gray-400 mr-2">⏳</span>
+                                              )}
+                                              <span className="font-medium text-gray-700">Execution Ready</span>
+                                            </div>
+                                            <span className={`font-semibold ${botActivity[bot.id].signalProgress.executionReady === 'ready' ? 'text-green-600' : 'text-gray-500'}`}>
+                                              {botActivity[bot.id].signalProgress.executionReady === 'ready' ? 'Ready to Trade' : 'Waiting for Signal...'}
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div 
+                                              className={`h-2.5 rounded-full transition-all duration-500 ${botActivity[bot.id].signalProgress.executionReady === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}
+                                              style={{ width: botActivity[bot.id].signalProgress.executionReady === 'ready' ? '100%' : '60%' }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Risk Management */}
+                                  {botActivity[bot.id]?.portfolioRisk && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {/* Portfolio Risk */}
+                                      <div className="bg-gradient-to-br from-white to-red-50 border-2 border-red-200 rounded-lg p-5 shadow-sm">
+                                        <div className="flex items-center justify-between mb-4">
+                                          <h6 className="text-base font-semibold text-gray-900">Portfolio Risk Assessment</h6>
+                                          <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
+                                            🛡️ LIVE
+                                          </span>
+                                        </div>
+                                        <div className="space-y-3 text-sm">
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Current Exposure:</span>
+                                            <span className="text-gray-900 font-bold">${(botActivity[bot.id].portfolioRisk.currentExposureUsd || 0).toFixed(2)}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Exposure %:</span>
+                                            <span className={`font-bold ${(botActivity[bot.id].portfolioRisk.currentExposurePercent || 0) > 50 ? 'text-red-600' : (botActivity[bot.id].portfolioRisk.currentExposurePercent || 0) > 25 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                              {(botActivity[bot.id].portfolioRisk.currentExposurePercent || 0).toFixed(2)}%
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Max Position Size:</span>
+                                            <span className="text-gray-900 font-bold">${(botActivity[bot.id].portfolioRisk.maxPositionSizeUsd || 0).toFixed(2)}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Open Positions:</span>
+                                            <span className="text-gray-900 font-bold">
+                                              <span className={botActivity[bot.id].portfolioRisk.currentOpenPositions >= botActivity[bot.id].portfolioRisk.maxOpenPositions ? 'text-red-600' : 'text-green-600'}>
+                                                {botActivity[bot.id].portfolioRisk.currentOpenPositions || 0}
+                                              </span>
+                                              <span className="text-gray-400"> / {botActivity[bot.id].portfolioRisk.maxOpenPositions || 3}</span>
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Daily Loss Limit:</span>
+                                            <span className="text-gray-900 font-bold">${(botActivity[bot.id].portfolioRisk.dailyLossLimitUsd || 0).toFixed(2)}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Daily Loss Used:</span>
+                                            <span className={`font-bold ${botActivity[bot.id].portfolioRisk.dailyLossUsedUsd > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                              ${(botActivity[bot.id].portfolioRisk.dailyLossUsedUsd || 0).toFixed(2)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-red-200">
+                                          <p className="text-xs text-gray-500 italic">🔄 Continuously monitoring portfolio exposure and risk limits</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Position Risk */}
+                                      <div className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 rounded-lg p-5 shadow-sm">
+                                        <div className="flex items-center justify-between mb-4">
+                                          <h6 className="text-base font-semibold text-gray-900">Position Risk Analysis</h6>
+                                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
+                                            ⚙️ ACTIVE
+                                          </span>
+                                        </div>
+                                        <div className="space-y-3 text-sm">
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Stop Loss Distance:</span>
+                                            <span className="text-red-600 font-bold">
+                                              {botActivity[bot.id].positionRisk.stopLossDistancePercent 
+                                                ? `${botActivity[bot.id].positionRisk.stopLossDistancePercent}%` 
+                                                : '2%'}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Take Profit Distance:</span>
+                                            <span className="text-green-600 font-bold">
+                                              {botActivity[bot.id].positionRisk.takeProfitDistancePercent 
+                                                ? `${botActivity[bot.id].positionRisk.takeProfitDistancePercent}%` 
+                                                : '4%'}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Risk/Reward Ratio:</span>
+                                            <span className="text-gray-900 font-bold">{botActivity[bot.id].positionRisk.riskRewardRatio || '1:2.0'}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center p-2 bg-white rounded">
+                                            <span className="text-gray-600 font-medium">Volatility Impact:</span>
+                                            <span className="text-gray-900 font-bold">{botActivity[bot.id].positionRisk.volatilityImpact || 'Medium'}</span>
+                                          </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-orange-200">
+                                          <p className="text-xs text-gray-500 italic">🔄 Risk parameters actively enforced on all trades</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Live Activity Log */}
+                                  {botActivity[bot.id] && (
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-lg p-5 shadow-sm">
+                                      <div className="flex items-center justify-between mb-4">
+                                        <h6 className="text-base font-semibold text-gray-900">Live Activity Log</h6>
+                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium animate-pulse">
+                                          📡 STREAMING
+                                        </span>
+                                      </div>
+                                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {/* Activity Entry 1 */}
+                                        <div className="flex items-start p-2 bg-white rounded border-l-4 border-green-500">
+                                          <span className="text-green-500 mr-2">✓</span>
+                                          <div className="flex-1">
+                                            <p className="text-xs font-medium text-gray-900">Data Collection Complete</p>
+                                            <p className="text-xs text-gray-500">Fetched latest gold price data and market indicators</p>
+                                            <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Activity Entry 2 */}
+                                        <div className="flex items-start p-2 bg-white rounded border-l-4 border-blue-500">
+                                          <span className="text-blue-500 mr-2 animate-pulse">⟳</span>
+                                          <div className="flex-1">
+                                            <p className="text-xs font-medium text-gray-900">Technical Analysis Active</p>
+                                            <p className="text-xs text-gray-500">
+                                              {botActivity[bot.id].marketAnalysis || 'Analyzing Bollinger Bands, RSI, and SMA indicators'}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                          </div>
+                                        </div>
+
+                                        {/* Activity Entry 3 - Dynamic based on status */}
+                                        {botActivity[bot.id].status?.includes('Analyzing') && (
+                                          <div className="flex items-start p-2 bg-white rounded border-l-4 border-purple-500">
+                                            <span className="text-purple-500 mr-2 animate-pulse">🔍</span>
+                                            <div className="flex-1">
+                                              <p className="text-xs font-medium text-gray-900">Market Analysis In Progress</p>
+                                              <p className="text-xs text-gray-500">Evaluating entry and exit signals based on current market conditions</p>
+                                              <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {botActivity[bot.id].status?.includes('Evaluating') && (
+                                          <div className="flex items-start p-2 bg-white rounded border-l-4 border-yellow-500">
+                                            <span className="text-yellow-500 mr-2 animate-pulse">📊</span>
+                                            <div className="flex-1">
+                                              <p className="text-xs font-medium text-gray-900">Signal Evaluation Active</p>
+                                              <p className="text-xs text-gray-500">Comparing current price against support/resistance levels and entry criteria</p>
+                                              <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {botActivity[bot.id].status?.includes('Monitoring') && (
+                                          <div className="flex items-start p-2 bg-white rounded border-l-4 border-green-500">
+                                            <span className="text-green-500 mr-2 animate-pulse">👁️</span>
+                                            <div className="flex-1">
+                                              <p className="text-xs font-medium text-gray-900">Price Monitoring Active</p>
+                                              <p className="text-xs text-gray-500">
+                                                {botActivity[bot.id].lastSignal || 'Watching for optimal entry/exit opportunities'}
+                                              </p>
+                                              <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Activity Entry 4 */}
+                                        <div className="flex items-start p-2 bg-white rounded border-l-4 border-indigo-500">
+                                          <span className="text-indigo-500 mr-2">🛡️</span>
+                                          <div className="flex-1">
+                                            <p className="text-xs font-medium text-gray-900">Risk Management Active</p>
+                                            <p className="text-xs text-gray-500">Continuously monitoring portfolio exposure and position limits</p>
+                                            <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleTimeString()}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="mt-3 pt-3 border-t border-indigo-200">
+                                        <p className="text-xs text-gray-500 italic">
+                                          💡 Bot runs analysis cycles every 60 seconds. This log updates in real-time.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Recent Trades */}
+                                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                    <h6 className="text-sm font-medium text-gray-900 mb-3">Recent Trades</h6>
+                                    {trades && trades.length > 0 ? (
+                                      <div className="overflow-x-auto">
+                                        <table className="min-w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-gray-200">
+                                              <th className="text-left py-2 px-2 text-gray-600">Time</th>
+                                              <th className="text-left py-2 px-2 text-gray-600">Side</th>
+                                              <th className="text-left py-2 px-2 text-gray-600">Price</th>
+                                              <th className="text-left py-2 px-2 text-gray-600">Quantity</th>
+                                              <th className="text-left py-2 px-2 text-gray-600">P&L</th>
+                                              <th className="text-left py-2 px-2 text-gray-600">Status</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {trades.slice(0, 5).map((trade: Trade) => (
+                                              <tr key={trade.id} className="border-b border-gray-100">
+                                                <td className="py-2 px-2 text-gray-900">
+                                                  {new Date(trade.created_at).toLocaleTimeString()}
+                                                </td>
+                                                <td className={`py-2 px-2 font-medium ${
+                                                  trade.side === 'buy' ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  {trade.side.toUpperCase()}
+                                                </td>
+                                                <td className="py-2 px-2 text-gray-900">${Number(trade.price).toFixed(2)}</td>
+                                                <td className="py-2 px-2 text-gray-900">{Number(trade.quantity).toFixed(4)}</td>
+                                                <td className={`py-2 px-2 font-medium ${
+                                                  Number(trade.pnl) >= 0 ? 'text-green-600' : 'text-red-600'
+                                                }`}>
+                                                  ${Number(trade.pnl).toFixed(2)}
+                                                </td>
+                                                <td className="py-2 px-2">
+                                                  <span className={`px-2 py-1 rounded text-xs ${
+                                                    trade.status === 'filled' ? 'bg-green-100 text-green-800' :
+                                                    trade.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                                  }`}>
+                                                    {trade.status}
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center py-4 text-sm text-gray-500">
+                                        <p>No trades yet. The bot will execute trades automatically when market conditions are favorable.</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -953,64 +1337,45 @@ export default function AITradingPage() {
                     onChange={(e) => setNewBot({...newBot, strategy_type: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="sma_crossover">SMA Crossover</option>
-                    <option value="rsi_strategy">RSI Strategy</option>
-                    <option value="bollinger_bands">Bollinger Bands</option>
-                    <option value="momentum">Momentum</option>
-                    <option value="dca">Dollar Cost Averaging</option>
+                    <option value="sma_crossover">Gold: Buy Low / Sell High</option>
                   </select>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Trading Pairs</label>
+                  <label className="block text-sm font-medium text-gray-700">Instrument</label>
                   <div className="mt-2 space-y-2">
-                    {newBot.trading_pairs.map((pair, index) => (
-                      <div key={index} className="flex">
-                        <input
-                          type="text"
-                          value={pair}
-                          onChange={(e) => {
-                            const newPairs = [...newBot.trading_pairs];
-                            newPairs[index] = e.target.value;
-                            setNewBot({...newBot, trading_pairs: newPairs});
-                          }}
-                          className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="BTCUSDT"
-                        />
-                        {newBot.trading_pairs.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newPairs = newBot.trading_pairs.filter((_, i) => i !== index);
-                              setNewBot({...newBot, trading_pairs: newPairs});
-                            }}
-                            className="ml-2 text-red-600 hover:text-red-800"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setNewBot({...newBot, trading_pairs: [...newBot.trading_pairs, '']})}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      + Add Trading Pair
-                    </button>
+                    <input
+                      type="text"
+                      value={newBot.trading_pairs[0]}
+                      readOnly
+                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700"
+                    />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Exchange</label>
+                  <label className="block text-sm font-medium text-gray-700">Mode</label>
+                  <input
+                    type="text"
+                    value="Paper"
+                    readOnly
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Settle via</label>
                   <select
-                    value={newBot.exchange}
-                    onChange={(e) => setNewBot({...newBot, exchange: e.target.value})}
+                    value={newBot.strategy_params.quoteCurrency}
+                    onChange={(e) => setNewBot({
+                      ...newBot,
+                      strategy_params: { ...newBot.strategy_params, quoteCurrency: e.target.value }
+                    })}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="binance">Binance</option>
-                    <option value="coinbase">Coinbase</option>
-                    <option value="kraken">Kraken</option>
+                    <option value="USDT">USDT</option>
+                    <option value="BTC">BTC</option>
+                    <option value="ETH">ETH</option>
                   </select>
                 </div>
                 

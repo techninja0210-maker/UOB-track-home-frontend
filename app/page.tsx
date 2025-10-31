@@ -9,6 +9,7 @@ import { formatCurrency, formatNumber, formatCrypto, formatCompact, formatPercen
 import Image from 'next/image';
 import notificationSocket from '@/lib/notificationSocket';
 import NotificationCenter from '@/components/NotificationCenter';
+// Coming soon modal no longer used here
 
 interface User {
   id: number;
@@ -1562,6 +1563,7 @@ export default function Dashboard() {
 
         
       </div>
+
     </div>
   );
 }

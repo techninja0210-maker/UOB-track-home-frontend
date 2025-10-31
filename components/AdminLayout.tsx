@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
+// Coming soon modal not used
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -217,6 +218,7 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
     </div>
   );
 }

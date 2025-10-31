@@ -7,6 +7,7 @@ import Image from 'next/image';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/formatters';
+// Coming soon modal not used
 
 interface User {
   id: number;
@@ -639,6 +640,7 @@ export default function SKRsPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
