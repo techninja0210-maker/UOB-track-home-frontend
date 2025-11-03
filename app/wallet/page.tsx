@@ -141,7 +141,7 @@ export default function WalletPage() {
         'USDT': { currency: 'USDT', balance: 0, symbol: '₮', valueUsd: 0, address: '', change24h: 0 }
       };
       
-      transformedBalances.forEach(b => {
+      transformedBalances.forEach((b: WalletBalance) => {
         currencyMap[b.currency] = b;
       });
       
