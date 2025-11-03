@@ -296,89 +296,89 @@ export default function WalletPage() {
       {/* Shared Navbar Component */}
       <Navbar user={user} onLogout={logout} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
         {/* Header Section - Modern Design */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Wallet</h1>
-          <p className="text-lg text-gray-500">Manage your cryptocurrency assets</p>
+        <div className="mb-6 sm:mb-8 lg:mb-12">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Wallet</h1>
+          <p className="text-sm sm:text-base lg:text-lg text-gray-500">Manage your cryptocurrency assets</p>
         </div>
 
         {/* Total Portfolio Card - Prominent */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-sm font-medium text-blue-100 uppercase tracking-wide mb-2">Total Portfolio Value</p>
-                <p className="text-5xl font-bold text-white mb-2">{formatCurrency(getTotalBalance())}</p>
-                <p className="text-blue-100 text-sm">Live prices • Updated {new Date().toLocaleTimeString()}</p>
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg">
+            <div className="flex items-start sm:items-center justify-between mb-4 sm:mb-6">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-blue-100 uppercase tracking-wide mb-1 sm:mb-2">Total Portfolio Value</p>
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-2 break-words">{formatCurrency(getTotalBalance())}</p>
+                <p className="text-blue-100 text-xs sm:text-sm">Live prices • Updated {new Date().toLocaleTimeString()}</p>
               </div>
-              <div className="h-16 w-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="hidden sm:flex h-12 w-12 lg:h-16 lg:w-16 bg-white/20 backdrop-blur-sm rounded-xl lg:rounded-2xl flex items-center justify-center flex-shrink-0 ml-4">
+                <svg className="h-6 w-6 lg:h-8 lg:w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
             </div>
 
             {/* Quick Actions - Modern Buttons */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-4 sm:mt-6">
               <Link
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
                   handleDeposit('BTC');
                 }}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/20 transition-all group"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2 group-hover:bg-white/30 transition-colors">
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-lg flex items-center justify-center mb-1 sm:mb-2 group-hover:bg-white/30 transition-colors">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
-                  <p className="text-white font-semibold text-sm">Deposit</p>
-                  <p className="text-blue-100 text-xs">Add funds</p>
+                  <p className="text-white font-semibold text-xs sm:text-sm">Deposit</p>
+                  <p className="text-blue-100 text-xs hidden sm:block">Add funds</p>
                 </div>
               </Link>
               <button
                 onClick={handleWithdraw}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/20 transition-all group"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2 group-hover:bg-white/30 transition-colors">
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-lg flex items-center justify-center mb-1 sm:mb-2 group-hover:bg-white/30 transition-colors">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m16 0l-4-4m4 4l-4 4" />
                     </svg>
                   </div>
-                  <p className="text-white font-semibold text-sm">Withdraw</p>
-                  <p className="text-blue-100 text-xs">Send funds</p>
+                  <p className="text-white font-semibold text-xs sm:text-sm">Withdraw</p>
+                  <p className="text-blue-100 text-xs hidden sm:block">Send funds</p>
                 </div>
               </button>
               <Link
                 href="/exchange"
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/20 transition-all group"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2 group-hover:bg-white/30 transition-colors">
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-lg flex items-center justify-center mb-1 sm:mb-2 group-hover:bg-white/30 transition-colors">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                   </div>
-                  <p className="text-white font-semibold text-sm">Exchange</p>
-                  <p className="text-blue-100 text-xs">Trade assets</p>
+                  <p className="text-white font-semibold text-xs sm:text-sm">Exchange</p>
+                  <p className="text-blue-100 text-xs hidden sm:block">Trade assets</p>
                 </div>
               </Link>
               <Link
                 href="/transactions"
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/20 transition-all group"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2 group-hover:bg-white/30 transition-colors">
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-lg flex items-center justify-center mb-1 sm:mb-2 group-hover:bg-white/30 transition-colors">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                   </div>
-                  <p className="text-white font-semibold text-sm">History</p>
-                  <p className="text-blue-100 text-xs">View all</p>
+                  <p className="text-white font-semibold text-xs sm:text-sm">History</p>
+                  <p className="text-blue-100 text-xs hidden sm:block">View all</p>
                 </div>
               </Link>
             </div>
@@ -386,15 +386,15 @@ export default function WalletPage() {
         </div>
 
         {/* Assets Section - Modern Card Design */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 sm:mb-8">
+          <div className="mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Assets</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Your Assets</h2>
               <p className="text-gray-500 text-sm">Manage your cryptocurrency holdings</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4">
             {walletBalances.map((balance) => {
               const usdValue = balance.balance * (cryptoPrices[balance.currency] || 0);
               const hasBalance = balance.balance > 0;
@@ -402,19 +402,20 @@ export default function WalletPage() {
               return (
                 <div
                   key={balance.currency}
-                  className={`bg-white border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
+                  className={`bg-white border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all ${
                     hasBalance ? 'border-gray-200' : 'border-gray-100'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    {/* Main Content */}
+                    <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                       {/* Currency Icon */}
-                      <div className={`h-14 w-14 rounded-xl flex items-center justify-center ${
+                      <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${
                         balance.currency === 'BTC' ? 'bg-orange-50' :
                         balance.currency === 'ETH' ? 'bg-blue-50' :
                         'bg-green-50'
                       }`}>
-                        <span className={`text-2xl font-bold ${
+                        <span className={`text-xl sm:text-2xl font-bold ${
                           balance.currency === 'BTC' ? 'text-orange-600' :
                           balance.currency === 'ETH' ? 'text-blue-600' :
                           'text-green-600'
@@ -424,35 +425,35 @@ export default function WalletPage() {
                       </div>
 
                       {/* Currency Info */}
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-1">
-                          <h3 className="text-lg font-bold text-gray-900">{balance.currency}</h3>
-                          <span className="text-sm text-gray-500">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                          <h3 className="text-base sm:text-lg font-bold text-gray-900">{balance.currency}</h3>
+                          <span className="text-xs sm:text-sm text-gray-500">
                             {balance.currency === 'BTC' ? 'Bitcoin' :
                              balance.currency === 'ETH' ? 'Ethereum' :
                              'Tether'}
                           </span>
                         </div>
-                        <div className="flex items-baseline space-x-4">
-                          <div>
-                            <p className="text-sm text-gray-500 mb-1">Balance</p>
-                            <p className="text-xl font-bold text-gray-900">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline sm:space-x-4 gap-2 sm:gap-0">
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-500 mb-0.5 sm:mb-1">Balance</p>
+                            <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
                               {formatCrypto(balance.balance)} {balance.currency}
                             </p>
                           </div>
-                          <div>
-                            <p className="text-sm text-gray-500 mb-1">USD Value</p>
-                            <p className="text-lg font-semibold text-gray-900">{formatCurrency(usdValue)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-500 mb-0.5 sm:mb-1">USD Value</p>
+                            <p className="text-base sm:text-lg font-semibold text-gray-900 break-words">{formatCurrency(usdValue)}</p>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2 sm:space-x-2 flex-shrink-0">
                       <button
                         onClick={() => handleDeposit(balance.currency as 'BTC' | 'ETH' | 'USDT')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm hover:shadow-md"
+                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg sm:rounded-xl hover:bg-blue-700 transition-colors text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md whitespace-nowrap"
                       >
                         Deposit
                       </button>
@@ -462,7 +463,7 @@ export default function WalletPage() {
                             setWithdrawalForm({ ...withdrawalForm, currency: balance.currency });
                             handleWithdraw();
                           }}
-                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold"
+                          className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg sm:rounded-xl hover:bg-gray-200 transition-colors text-xs sm:text-sm font-semibold whitespace-nowrap"
                         >
                           Withdraw
                         </button>
@@ -476,19 +477,19 @@ export default function WalletPage() {
         </div>
 
         {/* Transactions Section - Modern Table */}
-        <div className="mb-8">
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm">
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-white border border-gray-100 rounded-xl sm:rounded-2xl shadow-sm">
             {/* Header */}
-            <div className="px-6 py-5 border-b border-gray-100">
-              <div className="flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">Transaction History</h2>
-                  <p className="text-sm text-gray-500">All your deposits and withdrawals</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Transaction History</h2>
+                  <p className="text-xs sm:text-sm text-gray-500">All your deposits and withdrawals</p>
                 </div>
-                <div className="flex items-center space-x-2 bg-gray-50 rounded-xl p-1">
+                <div className="flex items-center space-x-2 bg-gray-50 rounded-lg sm:rounded-xl p-1">
                   <button
                     onClick={() => setActiveTab('transactions')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                       activeTab === 'transactions'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
@@ -498,7 +499,7 @@ export default function WalletPage() {
                   </button>
                   <button
                     onClick={() => setActiveTab('withdrawals')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                       activeTab === 'withdrawals'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
@@ -511,39 +512,40 @@ export default function WalletPage() {
             </div>
 
             {/* Table Content */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6 overflow-x-auto">
               {activeTab === 'withdrawals' ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Currency</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Transaction</th>
-                      </tr>
-                    </thead>
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle sm:block">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Currency</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Destination</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Transaction</th>
+                        </tr>
+                      </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                       {withdrawalHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center">
+                          <td colSpan={6} className="px-3 sm:px-4 py-8 sm:py-12 text-center">
                             <div className="flex flex-col items-center">
-                              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m16 0l-4-4m4 4l-4 4" />
                                 </svg>
                               </div>
-                              <p className="text-gray-500 font-medium">No withdrawal requests</p>
-                              <p className="text-sm text-gray-400 mt-1">Your withdrawal history will appear here</p>
+                              <p className="text-sm sm:text-base text-gray-500 font-medium">No withdrawal requests</p>
+                              <p className="text-xs sm:text-sm text-gray-400 mt-1">Your withdrawal history will appear here</p>
                             </div>
                           </td>
                         </tr>
                       ) : (
                         withdrawalHistory.map((withdrawal) => (
                           <tr key={withdrawal.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">
                               {new Date(withdrawal.createdAt).toLocaleDateString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric', 
@@ -552,21 +554,21 @@ export default function WalletPage() {
                                 minute: '2-digit'
                               })}
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold bg-gray-100 text-gray-800">
+                            <td className="px-3 sm:px-4 py-3 sm:py-4">
+                              <span className="inline-flex items-center px-2 sm:px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-800">
                                 {withdrawal.currency}
                               </span>
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                            <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-900">
                               {formatCrypto(withdrawal.amount)} {withdrawal.currency}
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-600 max-w-xs">
+                            <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-600 max-w-xs hidden md:table-cell">
                               <code className="font-mono text-xs bg-gray-50 px-2 py-1 rounded break-all">
                                 {withdrawal.destinationAddress}
                               </code>
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                            <td className="px-3 sm:px-4 py-3 sm:py-4">
+                              <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full ${
                                 withdrawal.status === 'completed' ? 'bg-green-100 text-green-700' :
                                 withdrawal.status === 'approved' ? 'bg-blue-100 text-blue-700' :
                                 withdrawal.status === 'rejected' || withdrawal.status === 'failed' ? 'bg-red-100 text-red-700' :
@@ -575,7 +577,7 @@ export default function WalletPage() {
                                 {withdrawal.status}
                               </span>
                             </td>
-                            <td className="px-4 py-4 text-sm">
+                            <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm hidden lg:table-cell">
                               {withdrawal.transactionHash ? (
                                 <a 
                                   href={`https://sepolia.etherscan.io/tx/${withdrawal.transactionHash}`}
@@ -584,7 +586,7 @@ export default function WalletPage() {
                                   className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"
                                 >
                                   View
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                   </svg>
                                 </a>
@@ -597,79 +599,82 @@ export default function WalletPage() {
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Result</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {transactions.length === 0 ? (
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle sm:block">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td colSpan={5} className="px-4 py-12 text-center">
-                            <div className="flex flex-col items-center">
-                              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                              </div>
-                              <p className="text-gray-500 font-medium">No transactions yet</p>
-                              <p className="text-sm text-gray-400 mt-1">Your transaction history will appear here</p>
-                            </div>
-                          </td>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Result</th>
                         </tr>
-                      ) : (
-                        transactions.map((transaction) => (
-                          <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {new Date(transaction.timestamp).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric', 
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-semibold ${
-                                transaction.type === 'deposit' ? 'bg-green-100 text-green-700' :
-                                transaction.type === 'withdrawal' ? 'bg-red-100 text-red-700' :
-                                'bg-blue-100 text-blue-700'
-                              }`}>
-                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                              {transaction.amount}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                transaction.status === 'completed' ? 'bg-green-100 text-green-700' : 
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {transaction.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                transaction.result === 'Success' ? 'bg-green-100 text-green-700' : 
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {transaction.result}
-                              </span>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {transactions.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 sm:px-4 py-8 sm:py-12 text-center">
+                              <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                  </svg>
+                                </div>
+                                <p className="text-sm sm:text-base text-gray-500 font-medium">No transactions yet</p>
+                                <p className="text-xs sm:text-sm text-gray-400 mt-1">Your transaction history will appear here</p>
+                              </div>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          transactions.map((transaction) => (
+                            <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">
+                                {new Date(transaction.timestamp).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                <span className={`inline-flex items-center px-2 sm:px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold ${
+                                  transaction.type === 'deposit' ? 'bg-green-100 text-green-700' :
+                                  transaction.type === 'withdrawal' ? 'bg-red-100 text-red-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                                </span>
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-900 break-words">
+                                {transaction.amount}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full ${
+                                  transaction.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {transaction.status}
+                                </span>
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 hidden sm:table-cell">
+                                <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full ${
+                                  transaction.result === 'Success' ? 'bg-green-100 text-green-700' : 
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {transaction.result}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -679,60 +684,60 @@ export default function WalletPage() {
 
       {/* Deposit Modal - Modern Design */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-            <div className="px-6 py-5 border-b border-gray-100">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-lg w-full my-4">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">Deposit {depositCurrency}</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900">Deposit {depositCurrency}</h3>
                 <button
                   onClick={() => setShowDepositModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {depositAddresses[depositCurrency] ? (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div className="text-center">
-                    <div className="inline-block p-4 bg-gray-50 rounded-xl mb-4">
+                    <div className="inline-block p-3 sm:p-4 bg-gray-50 rounded-lg sm:rounded-xl mb-3 sm:mb-4">
                       <img
                         alt={`${depositCurrency} Deposit QR`}
-                        className="h-48 w-48 rounded-lg bg-white border mx-auto"
+                        className="h-40 w-40 sm:h-48 sm:w-48 rounded-lg bg-white border mx-auto"
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${
                           depositCurrency === 'BTC' ? 'bitcoin:' : ''
                         }${encodeURIComponent(depositAddresses[depositCurrency])}`}
                       />
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">Scan QR code or copy address below</p>
+                    <p className="text-xs sm:text-sm text-gray-600 mb-2">Scan QR code or copy address below</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Deposit Address</label>
-                    <div className="flex items-center space-x-2">
-                      <code className="flex-1 text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-800 break-all">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Deposit Address</label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2">
+                      <code className="flex-1 text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-gray-800 break-all">
                         {depositAddresses[depositCurrency]}
                       </code>
                       <button
                         onClick={() => copyToClipboard(depositAddresses[depositCurrency])}
-                        className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
+                        className="px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm font-semibold whitespace-nowrap"
                       >
                         Copy
                       </button>
                     </div>
                   </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-800">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                    <p className="text-xs sm:text-sm text-blue-800">
                       <strong>Important:</strong> Send only {depositCurrency} to this address. Sending other cryptocurrencies may result in permanent loss.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-500">Loading deposit address...</p>
+                <div className="text-center py-6 sm:py-8">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600 mb-3 sm:mb-4"></div>
+                  <p className="text-sm sm:text-base text-gray-500">Loading deposit address...</p>
                 </div>
               )}
             </div>
@@ -742,29 +747,29 @@ export default function WalletPage() {
 
       {/* Withdrawal Modal - Modern Design */}
       {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-            <div className="px-6 py-5 border-b border-gray-100">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-lg w-full my-4">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">Withdraw Cryptocurrency</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900">Withdraw Cryptocurrency</h3>
                 <button
                   onClick={() => setShowWithdrawModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
-            <div className="p-6">
-              <div className="space-y-5">
+            <div className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Currency</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Currency</label>
                   <select 
                     value={withdrawalForm.currency}
                     onChange={(e) => setWithdrawalForm({ ...withdrawalForm, currency: e.target.value as 'BTC' | 'ETH' | 'USDT' })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
                   >
                     <option value="BTC">Bitcoin (BTC)</option>
                     <option value="ETH">Ethereum (ETH)</option>
@@ -772,7 +777,7 @@ export default function WalletPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Amount</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Amount</label>
                   <input 
                     type="number"
                     step="any"
@@ -780,50 +785,50 @@ export default function WalletPage() {
                     value={withdrawalForm.amount}
                     onChange={(e) => setWithdrawalForm({ ...withdrawalForm, amount: e.target.value })}
                     placeholder="0.00"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
                   />
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-1.5 sm:mt-2">
                     Available: <span className="font-semibold">
                       {formatCrypto(walletBalances.find(w => w.currency === withdrawalForm.currency)?.balance || 0)} {withdrawalForm.currency}
                     </span>
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Destination Address</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Destination Address</label>
                   <input 
                     type="text"
                     value={withdrawalForm.destinationAddress}
                     onChange={(e) => setWithdrawalForm({ ...withdrawalForm, destinationAddress: e.target.value })}
                     placeholder="Enter recipient wallet address"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm font-mono"
                   />
                 </div>
                 {withdrawalMessage && (
-                  <div className={`p-4 rounded-xl border ${
+                  <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border ${
                     withdrawalMessage.type === 'success' 
                       ? 'bg-green-50 border-green-200 text-green-800' 
                       : 'bg-red-50 border-red-200 text-red-800'
                   }`}>
-                    <p className="text-sm font-medium">{withdrawalMessage.text}</p>
+                    <p className="text-xs sm:text-sm font-medium">{withdrawalMessage.text}</p>
                   </div>
                 )}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                  <p className="text-sm text-yellow-800 font-medium">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-yellow-800 font-medium">
                     ⚠️ Withdrawals require admin approval. A 0.5% fee will be deducted.
                   </p>
                 </div>
               </div>
-              <div className="flex space-x-3 mt-6">
+              <div className="flex flex-col sm:flex-row gap-2 sm:space-x-3 mt-4 sm:mt-6">
                 <button
                   onClick={() => setShowWithdrawModal(false)}
-                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+                  className="flex-1 px-4 py-2.5 sm:py-3 border border-gray-200 text-gray-700 rounded-lg sm:rounded-xl hover:bg-gray-50 transition-colors text-sm font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={submitWithdrawal}
                   disabled={withdrawalLoading}
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors font-semibold shadow-sm hover:shadow-md"
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg sm:rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-semibold shadow-sm hover:shadow-md"
                 >
                   {withdrawalLoading ? 'Processing...' : 'Submit Request'}
                 </button>

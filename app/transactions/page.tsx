@@ -231,12 +231,12 @@ export default function TransactionsPage() {
   };
 
   const getTransactionIcon = (type: string) => {
-    const iconClass = "h-10 w-10 rounded-full flex items-center justify-center";
+    const iconClass = "h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center flex-shrink-0";
     switch (type) {
       case 'deposit':
         return (
           <div className={`${iconClass} bg-green-100`}>
-            <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
           </div>
@@ -244,7 +244,7 @@ export default function TransactionsPage() {
       case 'withdrawal':
         return (
           <div className={`${iconClass} bg-red-100`}>
-            <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
           </div>
@@ -252,7 +252,7 @@ export default function TransactionsPage() {
       case 'buy_gold':
         return (
           <div className={`${iconClass} bg-yellow-100`}>
-            <svg className="h-5 w-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
               <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
             </svg>
@@ -261,7 +261,7 @@ export default function TransactionsPage() {
       case 'sell_gold':
         return (
           <div className={`${iconClass} bg-orange-100`}>
-            <svg className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
@@ -269,7 +269,7 @@ export default function TransactionsPage() {
       default:
         return (
           <div className={`${iconClass} bg-blue-100`}>
-            <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
           </div>
@@ -326,60 +326,61 @@ export default function TransactionsPage() {
       {/* Shared Navbar Component */}
       <Navbar user={user} onLogout={handleLogout} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Transaction History</h1>
-              <p className="mt-2 text-gray-600">View and track all your transactions</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Transaction History</h1>
+              <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">View and track all your transactions</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
               {/* Export Buttons */}
               <button 
                 onClick={downloadTransactionsCSV}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+                className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
                 title="Download CSV"
               >
-                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                CSV
+                <span className="hidden sm:inline">CSV</span>
               </button>
               <button 
                 onClick={downloadTransactionsPDF}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+                className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
                 title="Download PDF"
               >
-                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                PDF
+                <span className="hidden sm:inline">PDF</span>
               </button>
               <Link
                 href="/exchange"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                className="inline-flex items-center px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                New Transaction
+                <span className="hidden sm:inline">New Transaction</span>
+                <span className="sm:hidden">New</span>
               </Link>
             </div>
           </div>
         </div>
 
         {/* Transaction Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
           {/* Total Transactions */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-700 mb-1">Total Transactions</p>
-                <p className="text-2xl font-bold text-blue-900">{totalTransactions}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-blue-700 mb-1 truncate">Total Transactions</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-900">{totalTransactions}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-200 rounded-xl flex items-center justify-center">
-                <svg className="h-6 w-6 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-blue-200 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ml-2">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
@@ -387,14 +388,14 @@ export default function TransactionsPage() {
           </div>
 
           {/* Completed */}
-          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-green-700 mb-1">Completed</p>
-                <p className="text-2xl font-bold text-green-900">{completedTransactions}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-green-700 mb-1 truncate">Completed</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-900">{completedTransactions}</p>
               </div>
-              <div className="h-12 w-12 bg-green-200 rounded-xl flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-green-200 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ml-2">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -402,14 +403,14 @@ export default function TransactionsPage() {
           </div>
 
           {/* Pending */}
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-6 shadow-sm">
+          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-yellow-700 mb-1">Pending</p>
-                <p className="text-2xl font-bold text-yellow-900">{pendingTransactions}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-yellow-700 mb-1 truncate">Pending</p>
+                <p className="text-xl sm:text-2xl font-bold text-yellow-900">{pendingTransactions}</p>
               </div>
-              <div className="h-12 w-12 bg-yellow-200 rounded-xl flex items-center justify-center">
-                <svg className="h-6 w-6 text-yellow-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-yellow-200 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ml-2">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-yellow-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -417,14 +418,14 @@ export default function TransactionsPage() {
           </div>
 
           {/* Failed */}
-          <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-6 shadow-sm">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-700 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-red-900">{failedTransactions}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-red-700 mb-1 truncate">Failed</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-900">{failedTransactions}</p>
               </div>
-              <div className="h-12 w-12 bg-red-200 rounded-xl flex items-center justify-center">
-                <svg className="h-6 w-6 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-red-200 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ml-2">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
@@ -433,154 +434,158 @@ export default function TransactionsPage() {
         </div>
 
         {/* Filters and Search Bar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
+        <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-sm mb-4 sm:mb-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
             {/* Search */}
-            <div className="flex-1">
+            <div className="w-full">
               <div className="relative">
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Search transactions by description or ID..."
+                  className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Search transactions..."
                 />
               </div>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Status:</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
 
-            {/* Type Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Type:</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="deposit">Deposit</option>
-                <option value="withdrawal">Withdrawal</option>
-                <option value="buy_gold">Buy Gold</option>
-                <option value="sell_gold">Sell Gold</option>
-                <option value="exchange">Exchange</option>
-              </select>
-            </div>
+              {/* Type Filter */}
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Type:</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All</option>
+                  <option value="deposit">Deposit</option>
+                  <option value="withdrawal">Withdrawal</option>
+                  <option value="buy_gold">Buy Gold</option>
+                  <option value="sell_gold">Sell Gold</option>
+                  <option value="exchange">Exchange</option>
+                </select>
+              </div>
 
-            {/* Sort */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="date">Date</option>
-                <option value="amount">Amount</option>
-                <option value="type">Type</option>
-              </select>
+              {/* Sort */}
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Sort:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="type">Type</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0"
+                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortOrder === 'asc' ? (
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Clear Filters */}
               <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                  setTypeFilter('all');
+                  setSortBy('date');
+                  setSortOrder('desc');
+                }}
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors whitespace-nowrap"
               >
-                {sortOrder === 'asc' ? (
-                  <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
-                  </svg>
-                )}
+                Clear All
               </button>
             </div>
-
-            {/* Clear Filters */}
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setTypeFilter('all');
-                setSortBy('date');
-                setSortOrder('desc');
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors whitespace-nowrap"
-            >
-              Clear All
-            </button>
           </div>
         </div>
 
         {/* Transactions List */}
         {loading ? (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading transactions...</p>
+          <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm p-8 sm:p-12 text-center">
+            <div className="inline-block h-6 w-6 sm:h-8 sm:w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading transactions...</p>
           </div>
         ) : paginatedTransactions.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
-            <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm p-8 sm:p-12 text-center">
+            <div className="h-16 w-16 sm:h-24 sm:w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+              <svg className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-            <p className="text-gray-500 mb-4">You haven't made any transactions yet.</p>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
+            <p className="text-sm sm:text-base text-gray-500 mb-4">You haven't made any transactions yet.</p>
             <Link
               href="/exchange"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white text-sm sm:text-base font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               Start Trading
             </Link>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm overflow-hidden">
             <div className="divide-y divide-gray-200">
               {paginatedTransactions.map((transaction) => {
                 const isPositive = transaction.type === 'deposit' || transaction.type === 'buy_gold';
                 return (
                   <div
                     key={transaction.id}
-                    className="p-6 hover:bg-gray-50 transition-colors duration-150"
+                    className="p-3 sm:p-4 md:p-6 hover:bg-gray-50 transition-colors duration-150"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                       {/* Left: Icon and Info */}
-                      <div className="flex items-center space-x-4 flex-1 min-w-0">
-                        {getTransactionIcon(transaction.type)}
+                      <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                        <div className="flex-shrink-0 mt-1 sm:mt-0">
+                          {getTransactionIcon(transaction.type)}
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-sm font-semibold text-gray-900 truncate">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-0">
+                            <h3 className="text-sm font-semibold text-gray-900 break-words sm:truncate">
                               {transaction.description}
                             </h3>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${getTypeColor(transaction.type)} bg-opacity-10`}>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${getTypeColor(transaction.type)} bg-opacity-10 self-start sm:self-auto whitespace-nowrap`}>
                               {transaction.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500 mt-1 sm:mt-0">
                             <span>{formatRelativeTime(transaction.timestamp)}</span>
                             <span className="hidden sm:inline">•</span>
-                            <span className="hidden sm:inline">ID: {transaction.id.slice(0, 8)}...</span>
+                            <span className="hidden md:inline">ID: {transaction.id.slice(0, 8)}...</span>
                             {transaction.transactionHash && (
                               <>
                                 <span className="hidden sm:inline">•</span>
@@ -588,9 +593,10 @@ export default function TransactionsPage() {
                                   href={`https://sepolia.etherscan.io/tx/${transaction.transactionHash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="hidden sm:inline text-blue-600 hover:text-blue-800 hover:underline"
+                                  className="text-blue-600 hover:text-blue-800 hover:underline break-all sm:break-normal"
                                 >
-                                  View on Explorer
+                                  <span className="hidden md:inline">View on Explorer</span>
+                                  <span className="md:hidden">Explorer</span>
                                 </a>
                               </>
                             )}
@@ -599,9 +605,9 @@ export default function TransactionsPage() {
                       </div>
 
                       {/* Right: Amount and Status */}
-                      <div className="flex items-center gap-4 ml-4">
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className="flex items-start sm:items-center justify-between sm:justify-end gap-3 sm:gap-4 sm:ml-4">
+                        <div className="text-left sm:text-right flex-1 sm:flex-initial">
+                          <div className={`text-base sm:text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                             {getTypePrefix(transaction.type)}
                             {transaction.currency === 'USD' || transaction.currency === 'USDT' 
                               ? formatCurrency(transaction.amount)
@@ -614,7 +620,7 @@ export default function TransactionsPage() {
                             </div>
                           )}
                         </div>
-                        <div>
+                        <div className="flex-shrink-0">
                           {getStatusBadge(transaction.status)}
                         </div>
                       </div>
@@ -628,106 +634,108 @@ export default function TransactionsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mt-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 mt-4 sm:mt-6">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {/* Results Info */}
-              <div className="text-sm text-gray-700">
+              <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
                 Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
                 <span className="font-medium">{Math.min(endIndex, sortedTransactions.length)}</span> of{' '}
                 <span className="font-medium">{sortedTransactions.length}</span> results
               </div>
 
-              {/* Pagination Controls */}
-              <div className="flex items-center gap-2">
-                {/* First Page */}
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="First Page"
-                >
-                  <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                  </svg>
-                </button>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                {/* Pagination Controls */}
+                <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
+                  {/* First Page */}
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="p-1.5 sm:p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="First Page"
+                  >
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                  </button>
 
-                {/* Previous Page */}
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium text-gray-700"
-                >
-                  Previous
-                </button>
+                  {/* Previous Page */}
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium text-gray-700"
+                  >
+                    Prev
+                  </button>
 
-                {/* Page Numbers */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum: number;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
+                  {/* Page Numbers */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
 
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Page */}
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium text-gray-700"
+                  >
+                    Next
+                  </button>
+
+                  {/* Last Page */}
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 sm:p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Last Page"
+                  >
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
 
-                {/* Next Page */}
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium text-gray-700"
-                >
-                  Next
-                </button>
-
-                {/* Last Page */}
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Last Page"
-                >
-                  <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Items Per Page */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Per page:</label>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                >
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value="50">50</option>
-                </select>
+                {/* Items Per Page */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">Per page:</label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>

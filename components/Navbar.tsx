@@ -23,6 +23,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(user || null);
 
   useEffect(() => {
@@ -37,16 +38,31 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
       if (!target.closest('.user-profile')) {
         setShowProfileDropdown(false);
       }
+      if (!target.closest('.mobile-menu') && !target.closest('.hamburger-button')) {
+        setShowMobileMenu(false);
+      }
     };
 
-    if (showProfileDropdown) {
+    if (showProfileDropdown || showMobileMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showProfileDropdown]);
+  }, [showProfileDropdown, showMobileMenu]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (showMobileMenu) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showMobileMenu]);
 
   const checkAuthentication = async () => {
     try {
@@ -107,9 +123,24 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 backdrop-blur-sm bg-white/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo and Mobile Menu Button */}
             <div className="flex items-center space-x-3">
-              <Link href="/">
+              {/* Mobile Hamburger Button */}
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors hamburger-button"
+                aria-label="Toggle menu"
+              >
+                <svg className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {showMobileMenu ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+              
+              <Link href="/" onClick={() => setShowMobileMenu(false)}>
                 <Image
                   src="/UOB_logo.png"
                   alt="UOB Security House"
@@ -122,7 +153,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               <span className="hidden sm:block text-sm font-semibold text-gray-900">UOB Security</span>
             </div>
 
-            {/* Navigation Links - Cleaner spacing */}
+            {/* Navigation Links - Desktop only */}
             <div className="hidden md:flex items-center space-x-1">
               {navItems.map((item) => (
                 <Link
@@ -214,26 +245,106 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             )}
           </div>
         </div>
+      </nav>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden border-t border-gray-200 bg-gray-50">
-          <div className="px-4 py-2 space-y-1">
+      {/* Mobile Sidebar Menu - Slide-in drawer */}
+      <div className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ${
+        showMobileMenu ? 'opacity-100 visible' : 'opacity-0 invisible'
+      }`}>
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowMobileMenu(false)}
+        />
+        
+        {/* Sidebar */}
+        <div className={`absolute left-0 top-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out mobile-menu ${
+          showMobileMenu ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          {/* Sidebar Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <Image
+                src="/UOB_logo.png"
+                alt="UOB Security House"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-lg object-contain"
+              />
+              <span className="text-sm font-semibold text-gray-900">UOB Security</span>
+            </div>
+            <button
+              onClick={() => setShowMobileMenu(false)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close menu"
+            >
+              <svg className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Navigation Items */}
+          <div className="py-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`block px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                onClick={() => setShowMobileMenu(false)}
+                className={`block px-4 py-3 text-sm font-medium transition-colors duration-200 ${
                   isActive(item.href)
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-blue-50 text-blue-600 border-r-3 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
                 {item.label}
               </Link>
             ))}
           </div>
+
+          {/* User Profile Section */}
+          {activeUser && (
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <span className="text-blue-600 font-medium text-base">
+                    {activeUser.fullName?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{activeUser.fullName}</div>
+                  <div className="text-xs text-gray-500">{activeUser.role}</div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Link
+                  href="/referrals"
+                  onClick={() => setShowMobileMenu(false)}
+                  className="block px-3 py-2 text-sm text-gray-700 hover:bg-white rounded-lg transition-colors"
+                >
+                  Referral Program
+                </Link>
+                <Link
+                  href="/account-settings"
+                  onClick={() => setShowMobileMenu(false)}
+                  className="block px-3 py-2 text-sm text-gray-700 hover:bg-white rounded-lg transition-colors"
+                >
+                  Account Settings
+                </Link>
+                <button
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    handleLogout();
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-white rounded-lg transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </nav>
+      </div>
     </>
   );
 }
