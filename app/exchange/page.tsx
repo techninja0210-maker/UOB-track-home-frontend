@@ -11,7 +11,7 @@ import Navbar from '@/components/Navbar';
 import api from '@/lib/api';
 
 interface User {
-  id: string;
+  id: number;
   fullName: string;
   email: string;
   role: string;
