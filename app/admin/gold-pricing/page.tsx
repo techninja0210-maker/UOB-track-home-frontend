@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import api from '@/lib/api';
 import { formatCurrency, formatPercentage } from '@/lib/formatters';
+import goldPriceSocket from '@/lib/goldPriceSocket';
 
 interface GoldPrice {
   currency: string;
@@ -32,48 +33,93 @@ export default function AdminGoldPricing() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date>(new Date());
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   useEffect(() => {
     loadGoldPrices();
     loadPriceSettings();
+
+    // Connect to real-time gold price WebSocket
+    goldPriceSocket.connect();
+
+    // Check connection status
+    const checkConnection = () => {
+      setIsRealtimeConnected(goldPriceSocket.isConnected());
+    };
+    checkConnection();
+    const connectionCheckInterval = setInterval(checkConnection, 5000);
+
+    // Subscribe to real-time updates
+    const unsubscribe = goldPriceSocket.subscribe((update) => {
+      setIsRealtimeConnected(true);
+      console.log('📊 Real-time gold price received:', update);
+      
+      // Update prices with real-time data from WebSocket
+      // Use prices directly from WebSocket update (includes EUR/GBP if available)
+      setGoldPrices([
+        {
+          currency: 'USD',
+          price: update.price,
+          change_24h: update.change24h,
+          last_updated: update.timestamp
+        },
+        {
+          currency: 'EUR',
+          price: update.eurPrice || parseFloat((update.price * 0.85).toFixed(2)),
+          change_24h: update.change24h,
+          last_updated: update.timestamp
+        },
+        {
+          currency: 'GBP',
+          price: update.gbpPrice || parseFloat((update.price * 0.78).toFixed(2)),
+          change_24h: update.change24h,
+          last_updated: update.timestamp
+        }
+      ]);
+      
+      setLastPriceUpdate(new Date(update.timestamp));
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribe();
+      clearInterval(connectionCheckInterval);
+    };
   }, []);
 
-  const loadGoldPrices = async () => {
+  const loadGoldPrices = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/gold-prices');
+      // Add timestamp to force cache bypass
+      const url = forceRefresh 
+        ? `/api/admin/gold-prices?force=true&_=${Date.now()}`
+        : `/api/admin/gold-prices`;
+      
+      const response = await api.get(url);
       const data = response.data;
+      
+      console.log('Gold prices API response:', data);
       
       // Ensure data is an array
       if (Array.isArray(data)) {
         setGoldPrices(data);
+        setMessage({ type: 'success', text: 'Gold prices refreshed successfully!' });
+        setTimeout(() => setMessage(null), 3000);
       } else {
         console.warn('API returned non-array data:', data);
         setGoldPrices([]);
+        setMessage({ type: 'error', text: 'Invalid data format received from server' });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading gold prices:', error);
-      // Mock data for development - always ensure it's an array
-      setGoldPrices([
-        {
-          currency: 'USD',
-          price: 2050.75,
-          change_24h: 12.45,
-          last_updated: new Date().toISOString()
-        },
-        {
-          currency: 'EUR',
-          price: 1890.32,
-          change_24h: -8.23,
-          last_updated: new Date().toISOString()
-        },
-        {
-          currency: 'GBP',
-          price: 1625.89,
-          change_24h: 5.67,
-          last_updated: new Date().toISOString()
-        }
-      ]);
+      setMessage({ 
+        type: 'error', 
+        text: `Failed to load gold prices: ${error.response?.data?.message || error.message}` 
+      });
+      
+      // Don't set mock data - let user see the error
+      setGoldPrices([]);
     } finally {
       setLoading(false);
     }
@@ -150,13 +196,33 @@ export default function AdminGoldPricing() {
         {/* Current Gold Prices */}
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Current Gold Prices</h2>
-                <button 
-              onClick={loadGoldPrices}
-              className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Current Gold Prices</h2>
+              <div className="flex items-center gap-2 mt-1">
+                {isRealtimeConnected ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      Live Updates
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Last: {lastPriceUpdate.toLocaleTimeString()}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-500">
+                    Updated: {lastPriceUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button 
+              onClick={() => loadGoldPrices(true)}
+              disabled={loading}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
             >
-              Refresh Prices
-                </button>
+              {loading ? 'Refreshing...' : 'Refresh Prices'}
+            </button>
               </div>
               
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -202,14 +268,28 @@ export default function AdminGoldPricing() {
             ))}
           </div>
 
-          {goldPrices.length === 0 && (
+          {goldPrices.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <span className="text-yellow-600 text-3xl">🥇</span>
-                  </div>
+              </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Gold Prices Available</h3>
-              <p className="text-gray-500">Gold prices are not currently available.</p>
-                </div>
+              <p className="text-gray-500 mb-4">Gold prices are not currently available.</p>
+              <p className="text-sm text-gray-400">Please check your API configuration and try refreshing.</p>
+              <button
+                onClick={() => loadGoldPrices(true)}
+                className="mt-4 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          
+          {loading && goldPrices.length === 0 && (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+              <p className="text-gray-600">Loading gold prices...</p>
+            </div>
           )}
                 </div>
 

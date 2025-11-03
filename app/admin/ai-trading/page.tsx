@@ -46,14 +46,22 @@ export default function AdminAITradingPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState('');
+  const [isClient, setIsClient] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'status' | 'trades' | 'pnl' | 'created'>('created');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     loadBots();
     
-    // Auto-refresh every 10 seconds to keep data synchronized
+    // Reduced auto-refresh to every 60 seconds (1 minute) for better UX
+    // Users can manually refresh using the refresh button
     const interval = setInterval(() => {
       loadBots();
-    }, 10000);
+    }, 60000);
     
     return () => clearInterval(interval);
   }, []);
@@ -67,13 +75,11 @@ export default function AdminAITradingPage() {
       }
       setError('');
       
-      // Use admin endpoint to get all bots with user information
       const response = await api.get('/api/ai-trading/admin/bots');
       
       if (response.data.success) {
         setBots(response.data.bots);
         
-        // Calculate stats
         const totalBots = response.data.bots.length;
         const runningBots = response.data.bots.filter((bot: TradingBot) => bot.status === 'running').length;
         const totalTrades = response.data.bots.reduce((sum: number, bot: TradingBot) => sum + bot.total_trades, 0);
@@ -85,6 +91,8 @@ export default function AdminAITradingPage() {
           totalTrades,
           totalPnl
         });
+        
+        setLastRefresh(new Date());
       }
     } catch (error: any) {
       console.error('Error loading bots:', error);
@@ -92,33 +100,26 @@ export default function AdminAITradingPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setLastRefresh(new Date());
     }
   };
 
   const handleStartBot = async (botId: string) => {
     try {
       await api.post(`/api/ai-trading/bots/${botId}/start`);
-      // Add a small delay to ensure database update is complete
-      setTimeout(() => {
-        loadBots(); // Refresh the list
-      }, 1000);
+      loadBots(true);
     } catch (error: any) {
       console.error('Error starting bot:', error);
-      setError(error.response?.data?.message || 'Failed to start bot');
+      alert(error.response?.data?.message || 'Failed to start bot');
     }
   };
 
   const handleStopBot = async (botId: string) => {
     try {
       await api.post(`/api/ai-trading/bots/${botId}/stop`);
-      // Add a small delay to ensure database update is complete
-      setTimeout(() => {
-        loadBots(); // Refresh the list
-      }, 1000);
+      loadBots(true);
     } catch (error: any) {
       console.error('Error stopping bot:', error);
-      setError(error.response?.data?.message || 'Failed to stop bot');
+      alert(error.response?.data?.message || 'Failed to stop bot');
     }
   };
 
@@ -126,131 +127,222 @@ export default function AdminAITradingPage() {
     if (!confirm('Are you sure you want to delete this bot? This action cannot be undone.')) {
       return;
     }
-
+    
     try {
       await api.delete(`/api/ai-trading/bots/${botId}`);
-      await loadBots(); // Refresh the list
+      loadBots(true);
     } catch (error: any) {
       console.error('Error deleting bot:', error);
-      setError(error.response?.data?.message || 'Failed to delete bot');
+      alert(error.response?.data?.message || 'Failed to delete bot');
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'running':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'stopped':
-        return 'bg-red-100 text-red-800';
       case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'error':
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
     }
   };
 
   const formatCurrency = (amount: number) => {
+    if (isNaN(amount)) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     });
   };
 
+  const handleSort = (column: 'name' | 'status' | 'trades' | 'pnl' | 'created') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
+
+  const sortedBots = [...bots].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+    
+    switch (sortBy) {
+      case 'name':
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case 'status':
+        aValue = a.status.toLowerCase();
+        bValue = b.status.toLowerCase();
+        break;
+      case 'trades':
+        aValue = a.total_trades;
+        bValue = b.total_trades;
+        break;
+      case 'pnl':
+        aValue = a.total_pnl;
+        bValue = b.total_pnl;
+        break;
+      case 'created':
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortBy !== column) return null;
+    return (
+      <svg className={`w-4 h-4 inline-block ml-1 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    );
+  };
+
   return (
-    <AdminLayout title="AI Trading Management" subtitle="Manage and monitor AI trading bots">
+    <AdminLayout>
       <div className="space-y-6">
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
-                </div>
-              </div>
-            </div>
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">AI Trading Bots</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Monitor and manage all automated trading bots
+              {lastRefresh && isClient && (
+                <span className="ml-2 text-xs text-gray-400">
+                  • Last updated: {lastRefresh.toLocaleTimeString()} • Auto-refresh: 60s
+                </span>
+              )}
+            </p>
           </div>
-        )}
+          <button
+            onClick={() => loadBots(true)}
+            disabled={loading || refreshing}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {refreshing ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </>
+            )}
+          </button>
+        </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">🤖</span>
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                    </svg>
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Bots</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.totalBots}</dd>
+                    <dd className="text-lg font-semibold text-gray-900">{stats.totalBots}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">▶️</span>
+                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Running Bots</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.runningBots}</dd>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Running</dt>
+                    <dd className="text-lg font-semibold text-gray-900">{stats.runningBots}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">📊</span>
+                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Trades</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.totalTrades}</dd>
+                    <dd className="text-lg font-semibold text-gray-900">{stats.totalTrades.toLocaleString()}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">💰</span>
+                  <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total P&L</dt>
-                    <dd className={`text-lg font-medium ${stats.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <dd className={`text-lg font-semibold ${stats.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(stats.totalPnl)}
                     </dd>
                   </dl>
@@ -260,176 +352,206 @@ export default function AdminAITradingPage() {
           </div>
         </div>
 
-        {/* Bots Table */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Trading Bots</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  Manage all AI trading bots in the system
-                  {lastRefresh && (
-                    <span className="ml-2 text-xs text-gray-400">
-                      Last updated: {lastRefresh.toLocaleTimeString()}
-                    </span>
-                  )}
-                </p>
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
               </div>
-              <button
-                onClick={() => loadBots(true)}
-                disabled={loading || refreshing}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                {refreshing ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Refreshing...
-                  </>
-                ) : (
-                  <>
-                    <svg className="-ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </>
-                )}
-              </button>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
             </div>
           </div>
+        )}
 
+        {/* Bots Table */}
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
           {loading ? (
-            <div className="px-4 py-5 sm:px-6">
-              <div className="flex justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
+            <div className="px-6 py-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="mt-4 text-sm text-gray-500">Loading trading bots...</p>
             </div>
           ) : bots.length === 0 ? (
-            <div className="px-4 py-5 sm:px-6 text-center">
-              <div className="text-gray-500">
-                <div className="text-4xl mb-4">🤖</div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Trading Bots</h3>
-                <p className="text-gray-500">No trading bots have been created yet.</p>
-              </div>
+            <div className="px-6 py-12 text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No trading bots</h3>
+              <p className="mt-1 text-sm text-gray-500">Get started by creating a new trading bot.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-200">
-              {bots.map((bot) => (
-                <li key={bot.id} className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="text-sm font-medium text-gray-900 truncate">
-                              {bot.name}
-                            </h4>
-                            {bot.user_email && (
-                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                                {bot.user_name || bot.user_email}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                            {bot.user_email && (
-                              <>
-                                <span className="text-blue-600 font-medium">{bot.user_email}</span>
-                                <span>•</span>
-                              </>
-                            )}
-                            <span>Strategy: {bot.strategy_type}</span>
-                            <span>•</span>
-                            <span>Exchange: {bot.exchange}</span>
-                            <span>•</span>
-                            <span>Pairs: {bot.trading_pairs.join(', ')}</span>
-                            <span>•</span>
-                            <span className={bot.is_paper_trading ? 'text-blue-600' : 'text-green-600'}>
-                              {bot.is_paper_trading ? 'Paper Trading' : 'Live Trading'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(bot.status)}`}>
-                            {bot.status}
-                          </span>
-                        </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors min-w-[140px]" onClick={() => handleSort('name')}>
+                      <div className="flex items-center">
+                        Bot Name
+                        <SortIcon column="name" />
                       </div>
-                      
-                      <div className="mt-2 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                        {bot.user_email && (
-                          <div className="md:col-span-1">
-                            <span className="text-gray-500">Owner:</span>
-                            <div className="mt-0.5">
-                              <span className="font-medium text-blue-600">{bot.user_name || 'Unknown'}</span>
-                              <div className="text-xs text-gray-400">{bot.user_email}</div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon column="status" />
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px]">
+                      Owner
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Strategy
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                      Trading Pairs
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('trades')}>
+                      <div className="flex items-center">
+                        Trades
+                        <SortIcon column="trades" />
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Win Rate
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('pnl')}>
+                      <div className="flex items-center">
+                        Total P&L
+                        <SortIcon column="pnl" />
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors min-w-[200px]" onClick={() => handleSort('created')}>
+                      <div className="flex items-center">
+                        Created
+                        <SortIcon column="created" />
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedBots.map((bot) => (
+                    <tr key={bot.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 min-w-[140px]">
+                        <div className="flex items-center">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 break-words">{bot.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {bot.is_paper_trading ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
+                                  Paper
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
+                                  Live
+                                </span>
+                              )}
                             </div>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(bot.status)}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${bot.status === 'running' ? 'bg-green-500' : bot.status === 'error' ? 'bg-red-500' : 'bg-gray-400'}`}></span>
+                          {bot.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 min-w-[180px]">
+                        <div className="text-sm text-gray-900 break-words">{bot.user_name || 'Unknown'}</div>
+                        <div className="text-xs text-gray-500 break-all">{bot.user_email || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{bot.strategy_type}</span>
+                      </td>
+                      <td className="px-6 py-4 min-w-[120px]">
+                        <div className="flex flex-wrap gap-1">
+                          {bot.trading_pairs && bot.trading_pairs.length > 0 ? (
+                            bot.trading_pairs.slice(0, 2).map((pair, idx) => (
+                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 whitespace-nowrap">
+                                {pair}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                          {bot.trading_pairs && bot.trading_pairs.length > 2 && (
+                            <span className="text-xs text-gray-500 whitespace-nowrap">+{bot.trading_pairs.length - 2}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{bot.total_trades}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {bot.total_trades > 0
+                            ? `${Math.round((bot.winning_trades / bot.total_trades) * 100)}%`
+                            : '0%'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`text-sm font-medium ${bot.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(bot.total_pnl)}
+                        </div>
+                        {bot.daily_pnl !== 0 && (
+                          <div className={`text-xs ${bot.daily_pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {bot.daily_pnl >= 0 ? '+' : ''}{formatCurrency(bot.daily_pnl)} today
+                          </div>
                         )}
-                        <div>
-                          <span className="text-gray-500">Trades:</span>
-                          <span className="ml-1 font-medium">{bot.total_trades}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Win Rate:</span>
-                          <span className="ml-1 font-medium">
-                            {bot.total_trades > 0 ? Math.round((bot.winning_trades / bot.total_trades) * 100) : 0}%
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Total P&L:</span>
-                          <span className={`ml-1 font-medium ${bot.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(bot.total_pnl)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Daily P&L:</span>
-                          <span className={`ml-1 font-medium ${bot.daily_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(bot.daily_pnl)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-2 text-xs text-gray-400">
-                        Created: {formatDate(bot.created_at)}
+                      </td>
+                      <td className="px-6 py-4 min-w-[200px]">
+                        <div className="text-sm text-gray-900 break-words">{formatDate(bot.created_at)}</div>
                         {bot.last_run_at && (
-                          <span className="ml-4">Last Run: {formatDate(bot.last_run_at)}</span>
+                          <div className="text-xs text-gray-500 break-words mt-1">Last: {formatDate(bot.last_run_at)}</div>
                         )}
-                        {bot.user_id && (
-                          <span className="ml-4">User ID: {bot.user_id}</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="ml-4 flex-shrink-0 flex space-x-2">
-                      {bot.status === 'running' ? (
-                        <button
-                          onClick={() => handleStopBot(bot.id)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        >
-                          Stop
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleStartBot(bot.id)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                        >
-                          Start
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => handleDeleteBot(bot.id)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          {bot.status === 'running' ? (
+                            <button
+                              onClick={() => handleStopBot(bot.id)}
+                              className="text-red-600 hover:text-red-900 transition-colors"
+                              title="Stop bot"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6v4H9z" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStartBot(bot.id)}
+                              className="text-green-600 hover:text-green-900 transition-colors"
+                              title="Start bot"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteBot(bot.id)}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                            title="Delete bot"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

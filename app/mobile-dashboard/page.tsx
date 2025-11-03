@@ -72,66 +72,47 @@ export default function MobileDashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      const walletResponse = await api.get('/api/wallet/balance');
-      const balances = walletResponse.data.balances || [];
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
       
-      setWalletBalances([
-        {
-          currency: 'USDT',
-          balance: 1250.50,
-          symbol: '₮',
-          valueUsd: 1250.50,
-          chartData: [1570, 1590, 1630, 20200]
-        },
-        {
-          currency: 'Bitcoin',
-          balance: 0.001234,
-          symbol: '₿',
-          valueUsd: 45.67,
-          chartData: [1600, 1550, 1620, 2008]
-        }
-      ]);
+      // Load REAL balances from API only - no fake data
+      const walletResponse = await api.get('/api/wallet/balances', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const balances = walletResponse.data || [];
+      
+      // Transform to expected format - ONLY real balances
+      const transformedBalances = balances.map((balance: any) => ({
+        currency: balance.currency,
+        balance: parseFloat(balance.balance) || 0,
+        symbol: balance.currency === 'BTC' ? '₿' : balance.currency === 'ETH' ? 'Ξ' : '₮',
+        valueUsd: parseFloat(balance.valueUsd) || 0,
+        chartData: []
+      }));
+      
+      setWalletBalances(transformedBalances);
 
-      setRecentTransactions([
-        {
-          id: '1',
-          type: 'deposit',
-          description: 'Tont (Jensbsin Mono)',
-          subDescription: 'Toţer Statto',
-          amount: '#24729',
-          timestamp: '2024-01-15T10:30:00Z',
-          status: 'completed'
-        },
-        {
-          id: '2',
-          type: 'exchange',
-          description: 'Inţe(Beacition Mono)',
-          subDescription: 'Toner Ftatro',
-          amount: '$26813',
-          timestamp: '2024-01-15T09:15:00Z',
-          status: 'completed'
-        },
-        {
-          id: '3',
-          type: 'purchase',
-          description: 'Jennsbrsin Mono',
-          subDescription: 'Gold Purchase',
-          amount: '$42776',
-          timestamp: '2024-01-15T08:45:00Z',
-          status: 'completed'
-        },
-        {
-          id: '4',
-          type: 'transaction',
-          description: 'TransBarction Mono)',
-          subDescription: 'Transaction',
-          amount: '#ADJA',
-          timestamp: '2024-01-15T08:30:00Z',
-          status: 'completed'
-        }
-      ]);
+      // Load REAL transactions from API only - no fake data
+      const transactionsResponse = await api.get('/api/wallet/transactions?limit=10', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const rawTransactions = transactionsResponse.data || [];
+      
+      const formattedTransactions = rawTransactions.map((tx: any) => ({
+        id: tx.id || tx.transactionId || `tx-${Date.now()}`,
+        type: tx.type || 'transaction',
+        description: tx.description || 'Transaction',
+        subDescription: tx.meta?.description || '',
+        amount: `${tx.amount || 0} ${tx.currency || ''}`,
+        timestamp: tx.timestamp || tx.createdAt || new Date().toISOString(),
+        status: tx.status || 'pending'
+      }));
+      
+      setRecentTransactions(formattedTransactions);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Set empty arrays on error - no fake data
+      setWalletBalances([]);
+      setRecentTransactions([]);
     }
   };
 

@@ -9,6 +9,8 @@ import { formatCurrency, formatNumber, formatCrypto, formatCompact, formatPercen
 import Image from 'next/image';
 import notificationSocket from '@/lib/notificationSocket';
 import NotificationCenter from '@/components/NotificationCenter';
+import bitcoinWallet from '@/lib/bitcoinWallet';
+import Navbar from '@/components/Navbar';
 // Coming soon modal no longer used here
 
 interface User {
@@ -61,16 +63,29 @@ interface SKRReceipt {
   currentValue?: number;
 }
 
+interface CrowdfundingContract {
+  id: string;
+  title: string;
+  description: string;
+  target_amount: number;
+  current_amount: number;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  start_date: string;
+  contract_type: 'gold' | 'oil';
+  profit_percentage: number;
+  progress_percentage: number;
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
   const [goldHoldings, setGoldHoldings] = useState<GoldHolding[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [skrReceipts, setSkrReceipts] = useState<SKRReceipt[]>([]);
+  const [crowdfundingContracts, setCrowdfundingContracts] = useState<CrowdfundingContract[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [filteredData, setFilteredData] = useState<{
     skrs: SKRReceipt[];
     transactions: Transaction[];
@@ -93,25 +108,42 @@ export default function Dashboard() {
   const [depositSuccess, setDepositSuccess] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [mmTokenBalance, setMmTokenBalance] = useState<string>(''); // e.g., USDT balance
+  
+  // Bitcoin wallet state
+  const [btcConnected, setBtcConnected] = useState(false);
+  const [btcAddress, setBtcAddress] = useState<string>('');
+  const [btcBalance, setBtcBalance] = useState<string>('');
+  const [btcWalletName, setBtcWalletName] = useState<string>('');
+  const [btcWallets, setBtcWallets] = useState<{name: string; installed: boolean; url: string}[]>([]);
+  
+  // Deposit history/status
+  const [depositHistory, setDepositHistory] = useState<any[]>([]);
+  const [showDepositHistory, setShowDepositHistory] = useState(false);
   // User's platform balances (off-chain credits)
   const [userBalances, setUserBalances] = useState<{[key: string]: number}>({
     BTC: 0,
     ETH: 0,
     USDT: 0
   });
-  // Current crypto prices
+  // Current crypto prices - initialized to zero, will be loaded from API
   const [cryptoPrices, setCryptoPrices] = useState<{[key: string]: number}>({
-    BTC: 50000,
-    ETH: 2000,
+    BTC: 0,
+    ETH: 0,
     USDT: 1
   });
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date>(new Date());
+  const [isClient, setIsClient] = useState(false);
   // Fixed top-right toast (3s)
   const [topToast, setTopToast] = useState<{ text: string; type: 'warning' | 'error' | 'success' } | null>(null);
   const showTopToast = (text: string, type: 'warning' | 'error' | 'success' = 'warning') => {
     setTopToast({ text, type });
     setTimeout(() => setTopToast(null), 3000);
   };
+
+  // Set client-side flag to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     checkAuthentication();
@@ -129,18 +161,6 @@ export default function Dashboard() {
     return () => notificationSocket.removeConnectListener(onConnect);
   }, [user?.id]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.user-profile')) {
-        setShowProfileDropdown(false);
-      }
-    };
-
-      document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Load pool address when currency changes or MetaMask connects
   useEffect(() => {
@@ -267,6 +287,43 @@ export default function Dashboard() {
       });
       setSkrReceipts(skrResponse.data.receipts || []);
 
+      // Load crowdfunding contracts (get first 3 ongoing and upcoming)
+      try {
+        // Fetch all contracts and filter on frontend (more reliable)
+        const response = await api.get('/api/crowdfunding/contracts?limit=10');
+        
+        console.log('Crowdfunding API response:', response.data);
+        
+        // Handle response structure
+        let allContracts = [];
+        if (response.data?.success && Array.isArray(response.data?.data)) {
+          allContracts = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          allContracts = response.data;
+        } else if (Array.isArray(response.data?.data)) {
+          allContracts = response.data.data;
+        }
+        
+        // Filter to get ongoing and upcoming contracts, take first 3
+        const filteredContracts = allContracts
+          .filter((contract: CrowdfundingContract) => 
+            contract.status === 'ongoing' || contract.status === 'upcoming'
+          )
+          .slice(0, 3);
+        
+        console.log('Filtered crowdfunding contracts:', filteredContracts);
+        setCrowdfundingContracts(filteredContracts);
+      } catch (crowdfundingError: any) {
+        console.error('Error loading crowdfunding contracts:', crowdfundingError);
+        console.error('Error details:', {
+          message: crowdfundingError?.message,
+          response: crowdfundingError?.response?.data,
+          status: crowdfundingError?.response?.status,
+          url: crowdfundingError?.config?.url
+        });
+        setCrowdfundingContracts([]);
+      }
+
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
@@ -288,6 +345,90 @@ export default function Dashboard() {
       router.push('/login');
     }
   };
+
+  // Bitcoin Wallet Functions
+  const connectBitcoinWallet = async () => {
+    setIsConnecting(true);
+    setDepositError('');
+    
+    try {
+      const result = await bitcoinWallet.connect();
+      setBtcAddress(result.address);
+      setBtcWalletName(result.walletName);
+      setBtcConnected(true);
+      
+      // Get balance
+      try {
+        const balance = await bitcoinWallet.getBalance();
+        setBtcBalance(balance.toFixed(8));
+      } catch (balanceError) {
+        console.error('Failed to get BTC balance:', balanceError);
+      }
+      
+      notificationSocket.notifyLocal({
+        type: 'success',
+        title: `${result.walletName} connected`,
+        message: `${result.address.slice(0, 6)}...${result.address.slice(-4)}`,
+      });
+    } catch (error: any) {
+      console.error('Bitcoin wallet connection error:', error);
+      notificationSocket.notifyLocal({
+        type: 'error',
+        title: 'Bitcoin wallet connection failed',
+        message: error.message || 'Please install Unisat or Xverse wallet',
+      });
+      setDepositError(error.message || 'Failed to connect Bitcoin wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Load deposit history
+  const loadDepositHistory = async () => {
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.get('/api/wallet/deposits', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Filter by current currency
+      const filtered = response.data.filter((deposit: any) => 
+        deposit.currency === depositCurrency
+      );
+      setDepositHistory(filtered || []);
+    } catch (error) {
+      console.error('Error loading deposit history:', error);
+      setDepositHistory([]);
+    }
+  };
+
+  // Detect Bitcoin wallets on mount and when currency changes
+  useEffect(() => {
+    if (depositCurrency === 'BTC') {
+      const wallets = bitcoinWallet.detectWallets();
+      setBtcWallets(wallets);
+      
+      // Check if wallet is already connected
+      if (bitcoinWallet.isConnected()) {
+        setBtcAddress(bitcoinWallet.getAddress());
+        setBtcConnected(true);
+      }
+      
+      // Load deposit history for this currency
+      loadDepositHistory();
+    }
+  }, [depositCurrency]);
+
+  // Auto-refresh deposit history every 30 seconds when deposit section is visible
+  useEffect(() => {
+    if (depositCurrency === 'BTC' && poolAddress) {
+      loadDepositHistory();
+      const interval = setInterval(() => {
+        loadDepositHistory();
+      }, 30000); // Refresh every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [depositCurrency, poolAddress]);
 
   // MetaMask Functions
   const connectMetaMask = async () => {
@@ -681,16 +822,16 @@ export default function Dashboard() {
       const response = await api.get('/api/prices/crypto');
       if (response.data) {
         return {
-          BTC: response.data.BTC || 50000,
-          ETH: response.data.ETH || 2000,
+          BTC: response.data.BTC || 0,
+          ETH: response.data.ETH || 0,
           USDT: response.data.USDT || 1
         };
       }
     } catch (error) {
       console.error('Failed to get crypto prices:', error);
     }
-    // Fallback prices
-    return { BTC: 50000, ETH: 2000, USDT: 1 };
+    // Fallback prices - only use real price API data
+    return { BTC: 0, ETH: 0, USDT: 1 };
   };
 
   const sendDeposit = async () => {
@@ -765,9 +906,47 @@ export default function Dashboard() {
         setDepositSuccess(`Transaction sent! Hash: ${txHash}`);
         setDepositError(''); // Clear any previous errors
       } else if (depositCurrency === 'BTC') {
-        // BTC handled by external wallet; just surface address
-        setDepositSuccess(`Send BTC to: ${poolAddress}`);
-        return; // No transaction hash for BTC, so no processing needed
+        // BTC handled by Bitcoin wallet (Unisat/Xverse) or manual address
+        if (btcConnected && btcAddress) {
+          // Use Bitcoin wallet to send transaction
+          console.log('💰 Sending BTC transaction via wallet...', {
+            from: btcAddress,
+            to: poolAddress,
+            amount: depositAmount
+          });
+
+          try {
+            const txHash = await bitcoinWallet.sendBitcoin(poolAddress, parseFloat(depositAmount));
+            console.log('✅ BTC transaction sent:', txHash);
+            
+            // Process the deposit to credit user balance
+            try {
+              const processResponse = await api.post('/api/wallet/process-deposit', {
+                currency: 'BTC',
+                amount: parseFloat(depositAmount),
+                transactionHash: txHash,
+                fromAddress: btcAddress
+              });
+              
+              console.log('✅ Deposit processed successfully:', processResponse.data);
+              setDepositSuccess(`Deposit successful! Transaction: ${txHash.slice(0, 10)}... Your balance will be updated once confirmed.`);
+            } catch (processError: any) {
+              console.error('❌ Error processing deposit:', processError);
+              setDepositSuccess(`Transaction sent! Hash: ${txHash}. Processing may take a few minutes.`);
+            }
+            
+            // Refresh deposit history after processing
+            loadDepositHistory();
+          } catch (btcError: any) {
+            throw new Error(`Failed to send Bitcoin: ${btcError.message}`);
+          }
+        } else {
+          // Manual deposit - just show address
+          setDepositSuccess(`Send BTC to: ${poolAddress}`);
+          // Refresh deposit history periodically for manual deposits
+          loadDepositHistory();
+          return; // No transaction hash for manual BTC, so no processing needed
+        }
       }
 
       // Process the deposit to credit user balance (for ETH and USDT)
@@ -850,164 +1029,31 @@ export default function Dashboard() {
       {/* Reusable Notification Center (socket + programmatic) */}
       <NotificationCenter userId={user?.id ? String(user.id) : undefined} />
 
-      {/* Top Navigation Bar */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center">
-              <Image
-                src="/UOB_logo.png"
-                alt="UOB Security House"
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-lg object-contain"
-                priority
-              />
-            </div>
+      {/* Shared Navbar Component */}
+      <Navbar user={user} onLogout={handleLogout} />
 
-            {/* Navigation Links */}
-            <div className="hidden md:flex items-center space-x-8">
-          <Link href="/" className="text-sm font-medium text-primary-600 border-b-2 border-primary-600 pb-1">
-            Dashboard
-          </Link>
-          <Link href="/wallet" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            Wallet
-          </Link>
-          <Link href="/skrs" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            SKRs
-          </Link>
-          <Link href="/transactions" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            Transactions
-          </Link>
-          <Link href="/exchange" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            Exchange
-          </Link>
-          <Link href="/ai-trading" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200">
-            AI Trading
-          </Link>
-            </div>
-
-            {/* User Profile */}
-            <div className="relative user-profile">
-              <button
-                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                className="flex items-center space-x-3 text-sm rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors duration-200"
-              >
-                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-primary-600 font-medium text-sm">
-                    {user?.fullName?.charAt(0) || 'U'}
-                  </span>
-                </div>
-                <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium text-gray-900">{user?.fullName}</div>
-                  <div className="text-xs text-gray-500">{user?.role}</div>
-                </div>
-                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {showProfileDropdown && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
-                  </div>
-                  <div className="py-1">
-                    <div className="px-4 py-2 text-sm text-gray-500">
-                      User: {user?.role}
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-200 py-1">
-                    <Link
-                      href="/referrals"
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowProfileDropdown(false)}
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Referral Program
-                      </div>
-                    </Link>
-                    <Link
-                      href="/account-settings"
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowProfileDropdown(false)}
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Account Settings
-                      </div>
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign out
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Welcome Section - Minimal & Clean */}
+        <div className="mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome back, {user?.fullName}</h1>
+          <p className="text-lg text-gray-500">Here's an overview of your portfolio</p>
         </div>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden border-t border-gray-200 bg-gray-50">
-          <div className="px-4 py-2 space-y-1">
-            <Link href="/" className="block px-3 py-2 text-sm font-medium bg-primary-50 text-primary-600 rounded-lg">
-              Dashboard
-            </Link>
-            <Link href="/wallet" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              Wallet
-            </Link>
-            <Link href="/skrs" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              SKRs
-            </Link>
-            <Link href="/transactions" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              Transactions
-            </Link>
-            <Link href="/exchange" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              Exchange
-            </Link>
-            <Link href="/ai-trading" className="block px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors duration-200">
-              AI Trading
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Welcome back, {user?.fullName}</h2>
-          <p className="mt-2 text-gray-600">Manage your crypto and gold investments</p>
-        </div>
-
-        {/* Portfolio Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Portfolio Overview - Improved Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {/* Total Portfolio Value */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Portfolio</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPortfolioValue)}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Live prices • Updated {lastPriceUpdate.toLocaleTimeString()}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Total Portfolio</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{formatCurrency(totalPortfolioValue)}</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  Live • Updated {isClient ? lastPriceUpdate.toLocaleTimeString() : '—'}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-primary-50 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-14 w-14 bg-white/60 rounded-xl flex items-center justify-center shadow-sm">
+                <svg className="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
@@ -1015,95 +1061,102 @@ export default function Dashboard() {
           </div>
 
           {/* BTC Balance */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">BTC Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.BTC)}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.BTC * cryptoPrices.BTC)}</p>
-                <p className="text-xs text-green-600 mt-1">● Live</p>
+          <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Bitcoin</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{formatCrypto(userBalances.BTC)} BTC</p>
+                <p className="text-base text-gray-400">{formatCurrency(userBalances.BTC * cryptoPrices.BTC)}</p>
               </div>
-              <div className="h-12 w-12 bg-orange-50 rounded-lg flex items-center justify-center">
-                <span className="text-orange-600 font-bold text-lg">₿</span>
+              <div className="h-14 w-14 bg-orange-50 rounded-xl flex items-center justify-center">
+                <span className="text-orange-600 font-bold text-2xl">₿</span>
               </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-green-600">
+              <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+              Live price
             </div>
           </div>
 
           {/* ETH Balance */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">ETH Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.ETH)}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.ETH * cryptoPrices.ETH)}</p>
-                <p className="text-xs text-green-600 mt-1">● Live</p>
+          <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Ethereum</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{formatCrypto(userBalances.ETH)} ETH</p>
+                <p className="text-base text-gray-400">{formatCurrency(userBalances.ETH * cryptoPrices.ETH)}</p>
               </div>
-              <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <span className="text-blue-600 font-bold text-lg">Ξ</span>
+              <div className="h-14 w-14 bg-blue-50 rounded-xl flex items-center justify-center">
+                <span className="text-blue-600 font-bold text-2xl">Ξ</span>
               </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-green-600">
+              <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+              Live price
             </div>
           </div>
 
           {/* USDT Balance */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">USDT Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCrypto(userBalances.USDT)}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatCurrency(userBalances.USDT * cryptoPrices.USDT)}</p>
-                <p className="text-xs text-green-600 mt-1">● Live</p>
+          <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Tether</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{formatCrypto(userBalances.USDT)} USDT</p>
+                <p className="text-base text-gray-400">{formatCurrency(userBalances.USDT * cryptoPrices.USDT)}</p>
               </div>
-              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 font-bold text-lg">₮</span>
+              <div className="h-14 w-14 bg-green-50 rounded-xl flex items-center justify-center">
+                <span className="text-green-600 font-bold text-2xl">₮</span>
               </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-green-600">
+              <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+              Live price
             </div>
           </div>
         </div>
 
-        {/* Additional Portfolio Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Additional Portfolio Cards - Cleaner Design */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {/* Gold Holdings */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Gold Holdings</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalGoldValue)}</p>
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Gold Holdings</p>
+                <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(totalGoldValue)}</p>
                 {!hasGoldData && (
-                  <p className="text-xs text-gray-500 mt-1">No gold holdings yet</p>
+                  <p className="text-sm text-gray-400">No holdings yet</p>
                 )}
                 {hasGoldData && (
                   <button
                     onClick={downloadGoldHoldingsPDF}
-                    className="mt-2 text-xs text-primary-600 hover:text-primary-700 flex items-center space-x-1"
+                    className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2 transition-colors"
                   >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <span>Download PDF</span>
                   </button>
                 )}
               </div>
-              <div className="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
+              <div className="h-12 w-12 bg-yellow-50 rounded-xl flex items-center justify-center">
+                <span className="text-yellow-600 text-2xl">🥇</span>
               </div>
             </div>
           </div>
 
           {/* SKR Profit/Loss */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">SKR P&L</p>
-                <p className={`text-2xl font-bold ${totalSKRProfitLoss >= 0 ? 'text-success-600' : 'text-red-600'}`}>
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">SKR P&L</p>
+                <p className={`text-2xl font-bold mb-2 ${totalSKRProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(totalSKRProfitLoss)}
                 </p>
                 {!hasSkrData && (
-                  <p className="text-xs text-gray-500 mt-1">No SKR receipts yet</p>
+                  <p className="text-sm text-gray-400">No receipts yet</p>
                 )}
               </div>
-              <div className="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+              <div className="h-12 w-12 bg-green-50 rounded-xl flex items-center justify-center">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
@@ -1112,16 +1165,16 @@ export default function Dashboard() {
           </div>
 
           {/* Total Crypto Value */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Crypto Value</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCryptoValue)}</p>
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Total Crypto</p>
+                <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(totalCryptoValue)}</p>
                 {!hasCryptoData && (
-                  <p className="text-xs text-gray-500 mt-1">No crypto balances yet</p>
+                  <p className="text-sm text-gray-400">No balances yet</p>
                 )}
               </div>
-              <div className="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+              <div className="h-12 w-12 bg-purple-50 rounded-xl flex items-center justify-center">
                 <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
@@ -1130,145 +1183,196 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Crowdfunding Section */}
-        <div className="mb-8">
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
+        {/* Quick Actions Section - Cleaner Design */}
+        <div className="mb-12">
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-8 shadow-lg">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Crowdfunding Opportunities</h3>
-                <p className="text-sm text-gray-600 mt-1">Invest in Gold and Oil contracts with guaranteed returns</p>
+                <h2 className="text-2xl font-bold text-white mb-2">Quick Actions</h2>
+                <p className="text-blue-100">Deposit, trade, and manage your assets</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <a 
+                href="#full-deposit-section" 
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Deposit</p>
+                    <p className="text-blue-100 text-sm">Add funds</p>
+                  </div>
+                </div>
+              </a>
+              <Link 
+                href="/exchange" 
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Exchange</p>
+                    <p className="text-blue-100 text-sm">Trade assets</p>
+                  </div>
+                </div>
+              </Link>
+              <Link 
+                href="/wallet" 
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/20 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Wallet</p>
+                    <p className="text-blue-100 text-sm">Manage funds</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Crowdfunding Section - Cleaner Design */}
+        <div className="mb-12">
+          <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Crowdfunding Opportunities</h3>
+                <p className="text-gray-500">Invest in Gold and Oil contracts with guaranteed returns</p>
               </div>
               <Link 
                 href="/crowdfunding" 
-                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-                style={{ color: 'white' }}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all text-sm font-semibold shadow-sm hover:shadow-md"
               >
                 View All
               </Link>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Sample Gold Contract */}
-              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl">🥇</span>
-                    <span className="font-medium text-gray-900">Gold Mining</span>
-                  </div>
-                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                    Ongoing
-                  </span>
+              {crowdfundingContracts.length > 0 ? (
+                crowdfundingContracts.map((contract) => {
+                  const progress = Math.min(100, Math.max(0, parseFloat(String(contract.progress_percentage)) || 0));
+                  const targetAmount = parseFloat(String(contract.target_amount)) || 0;
+                  const currentAmount = parseFloat(String(contract.current_amount)) || 0;
+                  const profitPercent = parseFloat(String(contract.profit_percentage)) || 0;
+                  const startDate = contract.start_date ? new Date(contract.start_date) : null;
+                  
+                  return (
+                    <div key={contract.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-2xl">{contract.contract_type === 'gold' ? '🥇' : '🛢️'}</span>
+                          <span className="font-medium text-gray-900">{contract.title}</span>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          contract.status === 'ongoing' 
+                            ? 'bg-green-100 text-green-800' 
+                            : contract.status === 'upcoming'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {contract.status === 'ongoing' ? 'Ongoing' : 
+                           contract.status === 'upcoming' ? 'Upcoming' : 
+                           contract.status}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Target:</span>
+                          <span className="font-medium">{formatCurrency(targetAmount)}</span>
+                        </div>
+                        {contract.status === 'ongoing' ? (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Raised:</span>
+                              <span className="font-medium">{formatCurrency(currentAmount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Profit:</span>
+                              <span className="font-medium text-green-600">{profitPercent}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                              <div className="bg-primary-600 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
+                            </div>
+                            <div className="text-xs text-gray-500">{progress.toFixed(1)}% funded</div>
+                          </>
+                        ) : (
+                          <>
+                            {startDate && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Starts:</span>
+                                <span className="font-medium">{startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Profit:</span>
+                              <span className="font-medium text-green-600">{profitPercent}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                              <div className="bg-gray-300 h-2 rounded-full" style={{ width: '0%' }}></div>
+                            </div>
+                            <div className="text-xs text-gray-500">Starting soon</div>
+                          </>
+                        )}
+                      </div>
+                      <Link 
+                        href={`/crowdfunding/contract/${contract.id}`}
+                        className={`block w-full mt-3 text-center py-2 rounded-lg transition-colors text-sm ${
+                          contract.status === 'ongoing'
+                            ? 'bg-primary-600 text-white hover:bg-primary-700'
+                            : 'bg-gray-200 text-gray-800 cursor-not-allowed'
+                        }`}
+                        style={contract.status === 'ongoing' ? { color: 'white' } : {}}
+                      >
+                        {contract.status === 'ongoing' ? 'Invest Now' : 
+                         contract.status === 'upcoming' ? 'Coming Soon' : 
+                         'View Details'}
+                      </Link>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-3 text-center py-8 text-gray-500">
+                  <p>No crowdfunding opportunities available at the moment.</p>
+                  <Link href="/crowdfunding" className="text-primary-600 hover:text-primary-700 mt-2 inline-block">
+                    View All Crowdfunding
+                  </Link>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Target:</span>
-                    <span className="font-medium">$500,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Raised:</span>
-                    <span className="font-medium">$125,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Profit:</span>
-                    <span className="font-medium text-green-600">1%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-primary-600 h-2 rounded-full" style={{ width: '25%' }}></div>
-                  </div>
-                  <div className="text-xs text-gray-500">25% funded</div>
-                </div>
-                <Link 
-                  href="/crowdfunding" 
-                  className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
-                  style={{ color: 'white' }}
-                >
-                  Invest Now
-                </Link>
-              </div>
-
-              {/* Sample Oil Contract */}
-              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl">🛢️</span>
-                    <span className="font-medium text-gray-900">Oil Exploration</span>
-                  </div>
-                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                    Ongoing
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Target:</span>
-                    <span className="font-medium">$1,000,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Raised:</span>
-                    <span className="font-medium">$750,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Profit:</span>
-                    <span className="font-medium text-green-600">1%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-primary-600 h-2 rounded-full" style={{ width: '75%' }}></div>
-                  </div>
-                  <div className="text-xs text-gray-500">75% funded</div>
-                </div>
-                <Link 
-                  href="/crowdfunding" 
-                  className="block w-full mt-3 bg-primary-600 text-white text-center py-2 rounded-lg hover:bg-primary-700 transition-colors text-sm"
-                  style={{ color: 'white' }}
-                >
-                  Invest Now
-                </Link>
-              </div>
-
-              {/* Upcoming Contract */}
-              <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl">🥇</span>
-                    <span className="font-medium text-gray-900">Gold Reserve</span>
-                  </div>
-                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                    Upcoming
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Target:</span>
-                    <span className="font-medium">$250,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Starts:</span>
-                    <span className="font-medium">Dec 1, 2024</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Profit:</span>
-                    <span className="font-medium text-green-600">1%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-gray-300 h-2 rounded-full" style={{ width: '0%' }}></div>
-                  </div>
-                  <div className="text-xs text-gray-500">Starting soon</div>
-                </div>
-                <Link 
-                  href="/crowdfunding" 
-                  className="block w-full mt-3 bg-gray-200 text-gray-800 text-center py-2 rounded-lg cursor-not-allowed text-sm"
-                >
-                  Coming Soon
-                </Link>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* MetaMask Connection */}
+        {/* Full Deposit Section - Cleaner Design */}
+        <div className="mb-12" id="full-deposit-section">
+          <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-2xl font-bold text-gray-900">Deposit Cryptocurrency</h2>
+              <span className="text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg font-medium">BTC • ETH • USDT</span>
+            </div>
+            <p className="text-gray-500 mt-2">Add funds to your account using MetaMask or external wallets</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+          {/* MetaMask Connection - Cleaner Design */}
           <div className="lg:col-span-1">
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Connect Wallet</h3>
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900 mb-6">Connect Wallet</h3>
               
               {!mmConnected ? (
                 <div className="text-center">
@@ -1376,6 +1480,20 @@ export default function Dashboard() {
                     </button>
                   </div>
 
+                  {/* Notice for BTC */}
+                  {depositCurrency === 'BTC' && (
+                    <div className="mb-4 p-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                      <div className="flex items-center mb-2">
+                        <span className="text-2xl mr-2">₿</span>
+                        <h4 className="text-sm font-bold text-orange-900">Bitcoin (BTC) Deposit Selected</h4>
+                      </div>
+                      <p className="text-xs text-orange-700">
+                        Scroll down below the deposit form to see your Bitcoin deposit address and instructions. 
+                        <strong> No MetaMask connection needed for BTC!</strong>
+                      </p>
+                    </div>
+                  )}
+
                   {/* Deposit Form */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1391,12 +1509,21 @@ export default function Dashboard() {
                             if (cur === 'USDT' && mmAddress) {
                               await loadUsdtBalance(mmAddress);
                             }
+                            // Auto-scroll to BTC deposit instructions when BTC is selected
+                            if (cur === 'BTC') {
+                              setTimeout(() => {
+                                const element = document.getElementById('btc-deposit-instructions');
+                                if (element) {
+                                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                              }, 300);
+                            }
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         >
-                          <option value="ETH">ETH</option>
+                          <option value="ETH">ETH (Ethereum)</option>
                           <option value="USDT">USDT (ERC20)</option>
-                          <option value="BTC">BTC</option>
+                          <option value="BTC">BTC (Bitcoin)</option>
                         </select>
                       </div>
                       <div className="sm:col-span-2">
@@ -1413,22 +1540,109 @@ export default function Dashboard() {
                     </div>
                     <button
                       onClick={sendDeposit}
-                      disabled={!depositAmount}
+                      disabled={!depositAmount || !poolAddress}
                       className="w-full bg-success-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-success-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
                     >
-                      {depositCurrency === 'BTC' ? 'Show BTC Deposit Instructions' : `Send ${depositCurrency} to Pool`}
+                      {depositCurrency === 'BTC' 
+                        ? (poolAddress ? 'Get BTC Deposit Address ↓' : 'Loading BTC Address...') 
+                        : `Send ${depositCurrency} to Pool`}
                     </button>
                   </div>
 
-                  {/* BTC Deposit Instructions */}
-                  {depositCurrency === 'BTC' && poolAddress && (
-                    <div className="mt-4 p-4 border border-orange-200 rounded-lg bg-orange-50">
-                      <div className="flex items-center mb-3">
-                        <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center mr-2">
-                          <span className="text-white text-xs font-bold">₿</span>
-                        </div>
-                        <h4 className="text-sm font-semibold text-orange-900">Bitcoin Deposit Instructions</h4>
+                  {/* BTC Deposit Instructions - Always show when BTC is selected */}
+                  {depositCurrency === 'BTC' && (
+                    <div className="mt-4 p-4 border-2 border-orange-400 rounded-lg bg-orange-50 shadow-md" id="btc-deposit-instructions">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-base font-bold text-orange-900 flex items-center">
+                          <span className="text-xl mr-2">₿</span>
+                          Bitcoin Deposit Instructions
+                        </h3>
+                        {poolAddress && (
+                          <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">Ready</span>
+                        )}
                       </div>
+                      {!poolAddress ? (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-orange-700 mb-2">Loading Bitcoin deposit address...</p>
+                          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
+                        </div>
+                      ) : (
+                        <>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center mr-2">
+                            <span className="text-white text-xs font-bold">₿</span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-orange-900">Bitcoin Deposit</h4>
+                        </div>
+                        {btcConnected && (
+                          <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                            {btcWalletName} Connected
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Bitcoin Wallet Connection - OPTIONAL */}
+                      {!btcConnected ? (
+                        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-blue-800 mb-2 font-semibold">
+                            ⚠️ Browser Wallet is OPTIONAL (Not Required)
+                          </p>
+                          <p className="text-xs text-blue-700 mb-3">
+                            You can send BTC from <strong>ANY Bitcoin wallet</strong> (mobile, desktop, hardware, exchange, etc.) 
+                            by copying the address below. The browser wallet is just for convenience.
+                          </p>
+                          <div className="border-t border-blue-200 pt-3 mt-3">
+                            <p className="text-xs text-blue-700 mb-2">
+                              <strong>Optional:</strong> Connect browser wallet for easier sending
+                            </p>
+                            <button
+                              onClick={connectBitcoinWallet}
+                              disabled={isConnecting}
+                              className="w-full bg-orange-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm mb-2"
+                            >
+                              {isConnecting ? 'Connecting...' : 'Connect Bitcoin Wallet (Optional)'}
+                            </button>
+                            <div className="text-xs text-orange-600 mt-2 space-y-1">
+                              <p className="font-semibold mb-1">Browser Wallets:</p>
+                              {btcWallets.map((wallet) => (
+                                <div key={wallet.name} className="flex items-center justify-between">
+                                  <span>{wallet.name}</span>
+                                  {wallet.installed ? (
+                                    <span className="text-green-600">✓ Installed</span>
+                                  ) : (
+                                    <a 
+                                      href={wallet.url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      Install
+                                    </a>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-green-800">Wallet Connected</span>
+                            <span className="text-xs text-green-600">{btcWalletName}</span>
+                          </div>
+                          <div className="text-xs text-green-700 font-mono break-all mb-1">
+                            {btcAddress}
+                          </div>
+                          {btcBalance && (
+                            <div className="text-xs text-green-600 mt-1">
+                              Balance: {btcBalance} BTC
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* QR Code and Manual Address */}
                       <div className="flex items-start gap-4">
                         <div className="text-center">
                           <img
@@ -1439,7 +1653,11 @@ export default function Dashboard() {
                           <p className="text-xs text-orange-600 mt-1">Scan QR Code</p>
                         </div>
                         <div className="flex-1">
-                          <p className="text-xs text-orange-700 mb-2">Send BTC to this address from your external wallet:</p>
+                          <p className="text-xs text-orange-700 mb-2">
+                            {btcConnected 
+                              ? 'Send BTC from your connected wallet or use this address (ANY Bitcoin wallet works):' 
+                              : 'Send BTC to this address from ANY Bitcoin wallet (mobile, desktop, exchange, etc.):'}
+                          </p>
                           <code className="block text-xs text-orange-800 bg-white p-2 rounded border font-mono break-all mb-2">
                             {poolAddress}
                           </code>
@@ -1460,9 +1678,110 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
-                      <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-700">
-                        <strong>Note:</strong> Bitcoin deposits are processed automatically once confirmed on the blockchain.
+                      <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                        <strong>✅ Automatic Detection:</strong> The platform automatically monitors this address. 
+                        Once you send BTC from ANY wallet, it will be detected and credited to your account 
+                        after 1-3 confirmations (~10-30 minutes). No wallet connection needed!
                       </div>
+                      
+                      {/* Deposit History/Status */}
+                      <div className="mt-4 border-t border-orange-200 pt-4">
+                        <button
+                          onClick={() => {
+                            setShowDepositHistory(!showDepositHistory);
+                            if (!showDepositHistory) {
+                              loadDepositHistory();
+                            }
+                          }}
+                          className="w-full flex items-center justify-between text-xs font-medium text-orange-700 hover:text-orange-800 transition-colors mb-2"
+                        >
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            View Deposit Status ({depositHistory.length})
+                          </span>
+                          <svg 
+                            className={`w-4 h-4 transition-transform ${showDepositHistory ? 'rotate-180' : ''}`} 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        {showDepositHistory && (
+                          <div className="mt-2 bg-white rounded-lg border border-orange-200 max-h-64 overflow-y-auto">
+                            {depositHistory.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-gray-500">
+                                No BTC deposits yet. Send BTC to the address above to see your deposit status here.
+                                <Link href="/transactions" className="block mt-2 text-blue-600 hover:text-blue-800 underline">
+                                  View All Transactions →
+                                </Link>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-gray-200">
+                                {depositHistory.map((deposit: any) => (
+                                  <div key={deposit.id} className="p-3 hover:bg-gray-50">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <span className="text-xs font-semibold text-gray-900">
+                                            {parseFloat(deposit.amount || 0).toFixed(8)} {deposit.currency}
+                                          </span>
+                                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                            deposit.status === 'completed' 
+                                              ? 'bg-green-100 text-green-800' 
+                                              : deposit.status === 'pending'
+                                              ? 'bg-yellow-100 text-yellow-800'
+                                              : 'bg-gray-100 text-gray-800'
+                                          }`}>
+                                            {deposit.status || 'pending'}
+                                          </span>
+                                        </div>
+                                        {deposit.transaction_hash && (
+                                          <div className="flex items-center space-x-1 mt-1">
+                                            <span className="text-xs text-gray-500">TX:</span>
+                                            <a
+                                              href={`https://blockstream.info/tx/${deposit.transaction_hash}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-xs text-blue-600 hover:text-blue-800 font-mono break-all"
+                                            >
+                                              {deposit.transaction_hash.slice(0, 16)}...
+                                            </a>
+                                          </div>
+                                        )}
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {new Date(deposit.created_at).toLocaleString()}
+                                          {deposit.completed_at && (
+                                            <span className="ml-2">
+                                              • Completed: {new Date(deposit.completed_at).toLocaleString()}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {depositHistory.length > 0 && (
+                              <div className="p-2 border-t border-gray-200 bg-gray-50">
+                                <Link 
+                                  href="/transactions" 
+                                  className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center"
+                                >
+                                  View All Transactions →
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -1503,25 +1822,28 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Recent Activity - Cleaner Design */}
           <div className="lg:col-span-2">
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-soft">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
-                <Link href="/transactions" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                  View All
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Recent Activity</h3>
+                  <p className="text-sm text-gray-500 mt-1">Your latest transactions</p>
+                </div>
+                <Link href="/transactions" className="text-blue-600 hover:text-blue-700 text-sm font-semibold transition-colors">
+                  View All →
                 </Link>
               </div>
               
               <div className="space-y-3">
                 {recentTransactions.slice(0, 5).map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                  <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors border border-gray-100">
+                    <div className="flex items-center space-x-4">
+                      <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
                         transaction.type === 'buy' || transaction.type === 'deposit' ? 'bg-green-100' : 
                         transaction.type === 'sell' || transaction.type === 'withdrawal' ? 'bg-red-100' : 'bg-blue-100'
                       }`}>
-                        <span className={`text-xs font-medium ${
+                        <span className={`text-sm font-bold ${
                           transaction.type === 'buy' || transaction.type === 'deposit' ? 'text-green-600' : 
                           transaction.type === 'sell' || transaction.type === 'withdrawal' ? 'text-red-600' : 'text-blue-600'
                         }`}>
@@ -1529,18 +1851,18 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{transaction.description}</p>
-                        <p className="text-xs text-gray-500">{new Date(transaction.timestamp).toLocaleDateString()}</p>
+                        <p className="text-sm font-semibold text-gray-900">{transaction.description}</p>
+                        <p className="text-xs text-gray-500 mt-1">{new Date(transaction.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-medium ${
+                      <p className={`text-base font-bold mb-1 ${
                         (transaction.type === 'buy' || transaction.type === 'deposit') ? 'text-green-600' : 
                         (transaction.type === 'sell' || transaction.type === 'withdrawal') ? 'text-red-600' : 'text-gray-900'
                       }`}>
                         {(transaction.type === 'buy' || transaction.type === 'deposit') ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                         transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
                         transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-red-100 text-red-700'
@@ -1552,8 +1874,14 @@ export default function Dashboard() {
                 ))}
                 
                 {recentTransactions.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No recent transactions</p>
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 font-medium">No recent transactions</p>
+                    <p className="text-sm text-gray-400 mt-1">Your transactions will appear here</p>
                   </div>
                 )}
               </div>

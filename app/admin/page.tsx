@@ -344,23 +344,28 @@ export default function AdminDashboard() {
                       Total Volume: ${chartData.reduce((sum, item) => sum + (item.volume || 0), 0).toLocaleString()}
                 </div>
                     <div className="text-sm text-gray-600">
-                      {chartData.length} days
-              </div>
+                      Showing: {chartData.length} days ({chartData.filter(d => d.volume > 0).length} with activity)
+                    </div>
             </div>
             
                   {/* Simple Bar Chart */}
-                  <div className="flex-1 flex items-end justify-between space-x-1 px-2">
+                  <div className="flex-1 flex items-end justify-between space-x-1 px-2 overflow-x-auto">
                     {chartData.map((item, index) => {
-                      const maxVolume = Math.max(...chartData.map(d => d.volume || 0));
-                      const height = maxVolume > 0 ? ((item.volume || 0) / maxVolume) * 80 + 10 : 10; // 10% minimum height
+                      const maxVolume = Math.max(...chartData.map(d => d.volume || 0), 1); // Ensure at least 1 to avoid division by zero
+                      // Calculate height: minimum 2px for visibility, scale up to 95% for active data
+                      const heightPercent = maxVolume > 0 ? Math.max(2, ((item.volume || 0) / maxVolume) * 95) : 2;
                       const date = new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                       
                       return (
-                        <div key={index} className="flex flex-col items-center flex-1 max-w-[60px]">
+                        <div key={index} className="flex flex-col items-center flex-1 min-w-[20px] max-w-[60px]">
                           <div className="w-full bg-gray-100 rounded-t-sm relative group h-32 flex items-end">
                             <div 
-                              className="w-full bg-blue-500 rounded-t-sm transition-all duration-300 hover:bg-blue-600 shadow-sm"
-                              style={{ height: `${height}%` }}
+                              className={`w-full rounded-t-sm transition-all duration-300 hover:shadow-md ${
+                                item.volume > 0 
+                                  ? 'bg-blue-500 hover:bg-blue-600' 
+                                  : 'bg-gray-200 hover:bg-gray-300'
+                              }`}
+                              style={{ height: `${heightPercent}%`, minHeight: '2px' }}
                             >
                               {/* Tooltip */}
                               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
