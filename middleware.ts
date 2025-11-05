@@ -14,6 +14,14 @@ const PUBLIC_PATHS = new Set([
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Allow static files (images, fonts, etc.) - files with extensions
+  const staticFileExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot', '.css', '.js'];
+  const hasStaticExtension = staticFileExtensions.some(ext => pathname.toLowerCase().endsWith(ext));
+  
+  if (hasStaticExtension) {
+    return NextResponse.next();
+  }
+
   // Allow public assets and public paths
   if (
     pathname.startsWith('/_next') ||
