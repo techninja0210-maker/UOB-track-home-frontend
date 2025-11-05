@@ -17,6 +17,7 @@ function LoginPage() {
   const [messageType, setMessageType] = useState<'success' | 'error'>('error');
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
+  const [geoRestrictionError, setGeoRestrictionError] = useState<any>(null);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,8 +71,15 @@ function LoginPage() {
       }, 1000);
 
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Login failed. Please try again.');
-      setMessageType('error');
+      // Handle geographic restriction and VPN detection errors
+      if (error.response?.data?.error === 'GEOGRAPHIC_RESTRICTION' || error.response?.data?.error === 'VPN_DETECTED') {
+        setGeoRestrictionError(error.response.data);
+        setMessage('');
+      } else {
+        setMessage(error.response?.data?.message || 'Login failed. Please try again.');
+        setMessageType('error');
+        setGeoRestrictionError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -244,6 +252,67 @@ function LoginPage() {
                     : 'bg-red-50 text-red-700 border border-red-200'
                 }`}>
                   {message}
+                </div>
+              )}
+
+              {/* Geographic Restriction Error */}
+              {geoRestrictionError && (
+                <div className="rounded-lg p-6 bg-red-50 border border-red-200">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-lg font-medium text-red-800">
+                        {geoRestrictionError.title}
+                      </h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p className="mb-2">{geoRestrictionError.message}</p>
+                        <p className="mb-3">{geoRestrictionError.details}</p>
+                        
+                        {geoRestrictionError.location && (
+                          <div className="bg-red-100 rounded-md p-3 mb-3">
+                            <p className="text-sm font-medium text-red-800">Detected Location:</p>
+                            <p className="text-sm text-red-700">
+                              {geoRestrictionError.location.city}, {geoRestrictionError.location.country}
+                            </p>
+                          </div>
+                        )}
+
+                        {geoRestrictionError.vpnInfo && (
+                          <div className="bg-orange-100 rounded-md p-3 mb-3">
+                            <p className="text-sm font-medium text-orange-800">VPN/Proxy Detection:</p>
+                            <p className="text-sm text-orange-700">
+                              {geoRestrictionError.vpnInfo.provider && `Provider: ${geoRestrictionError.vpnInfo.provider}`}
+                              {geoRestrictionError.vpnInfo.confidence && ` (Confidence: ${geoRestrictionError.vpnInfo.confidence}%)`}
+                              {geoRestrictionError.vpnInfo.isUSVPN && ' - US VPN Detected'}
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center space-x-4">
+                          <a 
+                            href={`mailto:${geoRestrictionError.supportEmail}?subject=Login Access Request&body=Hello, I would like to request access to login to your platform. My location: ${geoRestrictionError.location?.city}, ${geoRestrictionError.location?.country}`}
+                            className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Contact Support
+                          </a>
+                          
+                          <button
+                            onClick={() => setGeoRestrictionError(null)}
+                            className="text-sm text-red-600 hover:text-red-500 underline"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

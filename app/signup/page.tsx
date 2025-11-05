@@ -47,7 +47,7 @@ export default function SignupPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
     if (refCode) {
-      setFormData(prev => ({ ...prev, referralCode: refCode }));
+      setFormData(prev => ({ ...prev, referralCode: refCode.trim() }));
     }
     
     getUserIP();
@@ -55,17 +55,22 @@ export default function SignupPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    
+    // Update form data
+    const updatedFormData = {
+      ...formData,
       [name]: value
-    }));
+    };
+    
+    setFormData(updatedFormData);
 
-    // Real-time validation
-    validateField(name, value);
+    // Real-time validation with updated form data
+    validateField(name, value, updatedFormData);
   };
 
-  const validateField = (name: string, value: string) => {
+  const validateField = (name: string, value: string, currentFormData?: typeof formData) => {
     let isValid = false;
+    const data = currentFormData || formData;
     
     switch (name) {
       case 'fullName':
@@ -76,9 +81,15 @@ export default function SignupPage() {
         break;
       case 'password':
         isValid = value.length >= 6;
+        // Re-validate confirmPassword if password changes
+        if (data.confirmPassword) {
+          setTimeout(() => {
+            validateField('confirmPassword', data.confirmPassword, data);
+          }, 0);
+        }
         break;
       case 'confirmPassword':
-        isValid = value === formData.password && value.length > 0;
+        isValid = value === data.password && value.length > 0;
         break;
       default:
         isValid = false;
@@ -110,17 +121,48 @@ export default function SignupPage() {
     }
   };
 
+  // Synchronous validation function for submission
+  const validateFormSync = () => {
+    const validation = {
+      fullName: formData.fullName.length >= 2,
+      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email),
+      password: formData.password.length >= 6,
+      confirmPassword: formData.confirmPassword === formData.password && formData.confirmPassword.length > 0
+    };
+
+    // Update validation state
+    setFieldValidation(validation);
+
+    return validation;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
     setLocationWarning(null);
 
-    // Validate all fields
-    const isFormValid = Object.values(fieldValidation).every(Boolean) && termsAccepted;
+    // Synchronously validate all fields
+    const validation = validateFormSync();
+
+    // Check which fields are invalid
+    const invalidFields = [];
+    if (!validation.fullName) invalidFields.push('Full Name');
+    if (!validation.email) invalidFields.push('Email');
+    if (!validation.password) invalidFields.push('Password');
+    if (!validation.confirmPassword) invalidFields.push('Confirm Password');
+
+    // Check if form is valid
+    const isFormValid = Object.values(validation).every(Boolean) && termsAccepted;
 
     if (!isFormValid) {
-      setMessage('Please fill in all fields correctly and accept the terms.');
+      let errorMsg = 'Please fill in all fields correctly and accept the terms.';
+      if (invalidFields.length > 0) {
+        errorMsg = `Please fix the following: ${invalidFields.join(', ')}${!termsAccepted ? ', and accept the terms' : ''}.`;
+      } else if (!termsAccepted) {
+        errorMsg = 'Please accept the terms and conditions.';
+      }
+      setMessage(errorMsg);
       setMessageType('error');
       setLoading(false);
       return;
