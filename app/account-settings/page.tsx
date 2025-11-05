@@ -41,6 +41,20 @@ export default function AccountSettingsPage() {
     sessionTimeout: 30
   });
 
+  // 2FA setup state
+  const [twoFactorSetup, setTwoFactorSetup] = useState({
+    qrCode: '',
+    secret: '',
+    manualEntryKey: '',
+    verificationCode: '',
+    showSetup: false,
+    showDisable: false,
+    loading: false
+  });
+
+  // Disable 2FA state
+  const [disablePassword, setDisablePassword] = useState('');
+
   // Notification settings
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
@@ -111,15 +125,37 @@ export default function AccountSettingsPage() {
         return;
       }
       
-      const response = await api.get('/api/user/security', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      const securityData = response.data.data || response.data;
-      setSecuritySettings(securityData);
+      // Load 2FA status
+      try {
+        const twoFactorResponse = await api.get('/api/auth/2fa/status', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSecuritySettings(prev => ({
+          ...prev,
+          twoFactorEnabled: twoFactorResponse.data.enabled
+        }));
+      } catch (error) {
+        console.error('Error loading 2FA status:', error);
+      }
+
+      // Load other security settings
+      try {
+        const response = await api.get('/api/user/security', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const securityData = response.data.data || response.data;
+        setSecuritySettings(prev => ({
+          ...prev,
+          loginNotifications: securityData.loginNotifications ?? prev.loginNotifications,
+          sessionTimeout: securityData.sessionTimeout ?? prev.sessionTimeout
+        }));
+      } catch (error) {
+        console.error('Error loading security settings:', error);
+        // Use default settings if API fails
+      }
     } catch (error) {
       console.error('Error loading security settings:', error);
-      // Use default settings if API fails
     }
   };
 
@@ -169,6 +205,100 @@ export default function AccountSettingsPage() {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update profile' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggle2FA = async () => {
+    if (securitySettings.twoFactorEnabled) {
+      // Toggle OFF - show password input
+      setTwoFactorSetup(prev => ({ ...prev, showDisable: true, showSetup: false }));
+    } else {
+      // Toggle ON - generate QR code
+      setTwoFactorSetup(prev => ({ ...prev, loading: true, showDisable: false }));
+      setMessage(null);
+
+      try {
+        const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+        const response = await api.post('/api/auth/2fa/generate', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        setTwoFactorSetup({
+          qrCode: response.data.qrCode,
+          secret: response.data.secret,
+          manualEntryKey: response.data.manualEntryKey,
+          verificationCode: '',
+          showSetup: true,
+          showDisable: false,
+          loading: false
+        });
+
+        setMessage({ type: 'success', text: response.data.message || 'QR code generated. Please scan with your authenticator app.' });
+      } catch (error: any) {
+        setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to generate 2FA setup' });
+        setTwoFactorSetup(prev => ({ ...prev, loading: false, showSetup: false }));
+      }
+    }
+  };
+
+  const handleVerify2FA = async () => {
+    setTwoFactorSetup(prev => ({ ...prev, loading: true }));
+    setMessage(null);
+
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.post('/api/auth/2fa/verify', {
+        secret: twoFactorSetup.secret,
+        token: twoFactorSetup.verificationCode
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setMessage({ type: 'success', text: response.data.message || '2FA enabled successfully!' });
+      
+      // Reset setup state
+      setTwoFactorSetup({ qrCode: '', secret: '', manualEntryKey: '', verificationCode: '', showSetup: false, showDisable: false, loading: false });
+      
+      // Reload 2FA status
+      await loadSecuritySettings();
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setMessage(null);
+      }, 3000);
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to verify 2FA code' });
+      setTwoFactorSetup(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    setTwoFactorSetup(prev => ({ ...prev, loading: true }));
+    setMessage(null);
+
+    try {
+      const token = Cookies.get('authToken') || sessionStorage.getItem('authToken');
+      const response = await api.post('/api/auth/2fa/disable', {
+        password: disablePassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setMessage({ type: 'success', text: response.data.message || '2FA disabled successfully.' });
+      setDisablePassword('');
+      setTwoFactorSetup(prev => ({ ...prev, showDisable: false }));
+      
+      // Reload 2FA status
+      await loadSecuritySettings();
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setMessage(null);
+      }, 3000);
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to disable 2FA' });
+    } finally {
+      setTwoFactorSetup(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -362,30 +492,120 @@ export default function AccountSettingsPage() {
             
             <div className="px-6 py-6">
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</h4>
-                    <p className="text-sm text-gray-500">Add an extra layer of security to your account using an authenticator app like Google Authenticator or Authy</p>
-                    {securitySettings.twoFactorEnabled && (
-                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                        <p className="text-sm text-green-800">
-                          <strong>2FA Enabled:</strong> Your account is protected with two-factor authentication. You'll need both your password and a code from your authenticator app to log in.
-                        </p>
-                      </div>
-                    )}
+                {/* Two-Factor Authentication Section */}
+                <div className="border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</h4>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Add an extra layer of security using an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)
+                      </p>
+                      {securitySettings.twoFactorEnabled && (
+                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm text-green-800">
+                            <strong>✓ 2FA Enabled:</strong> Your account is protected. You'll need both your password and a code from your authenticator app to log in.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleToggle2FA}
+                      disabled={twoFactorSetup.loading}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
+                        securitySettings.twoFactorEnabled ? 'bg-green-600' : 'bg-gray-200'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          securitySettings.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setSecuritySettings(prev => ({ ...prev, twoFactorEnabled: !prev.twoFactorEnabled }))}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      securitySettings.twoFactorEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        securitySettings.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
+
+                  {/* Show QR code setup when toggling ON */}
+                  {twoFactorSetup.showSetup && !securitySettings.twoFactorEnabled && (
+                    <div className="mt-4 space-y-4 border-t pt-4">
+                      <div className="text-sm text-gray-600">
+                        <p className="font-medium mb-2">Step 1: Scan QR Code</p>
+                        <p className="mb-4">Open your authenticator app and scan this QR code:</p>
+                        {twoFactorSetup.qrCode && (
+                          <div className="flex justify-center mb-4">
+                            <img src={twoFactorSetup.qrCode} alt="2FA QR Code" className="border-2 border-gray-200 rounded-lg p-2 bg-white" />
+                          </div>
+                        )}
+                        <p className="font-medium mb-2">Or enter this key manually:</p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md p-3 font-mono text-sm text-center">
+                          {twoFactorSetup.manualEntryKey}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <p className="font-medium mb-2 text-sm text-gray-600">Step 2: Enter Verification Code</p>
+                        <p className="text-xs text-gray-500 mb-2">Enter the 6-digit code from your authenticator app to verify setup:</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={twoFactorSetup.verificationCode}
+                            onChange={(e) => setTwoFactorSetup(prev => ({ ...prev, verificationCode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                            placeholder="000000"
+                            maxLength={6}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-center text-lg font-mono tracking-widest focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={handleVerify2FA}
+                            disabled={twoFactorSetup.verificationCode.length !== 6 || twoFactorSetup.loading}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {twoFactorSetup.loading ? 'Verifying...' : 'Verify & Enable'}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => {
+                          setTwoFactorSetup({ qrCode: '', secret: '', manualEntryKey: '', verificationCode: '', showSetup: false, showDisable: false, loading: false });
+                        }}
+                        className="text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Show password input when toggling OFF */}
+                  {twoFactorSetup.showDisable && securitySettings.twoFactorEnabled && (
+                    <div className="mt-4 border-t pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Enter your password to disable 2FA
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={disablePassword}
+                          onChange={(e) => setDisablePassword(e.target.value)}
+                          placeholder="Enter your password"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          onClick={handleDisable2FA}
+                          disabled={!disablePassword || twoFactorSetup.loading}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Disable
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setTwoFactorSetup(prev => ({ ...prev, showDisable: false }));
+                          setDisablePassword('');
+                        }}
+                        className="mt-2 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between">

@@ -49,7 +49,7 @@ function LoginPage() {
       // Check if 2FA is required
       if (response.data.requiresTwoFactor) {
         setRequiresTwoFactor(true);
-        setMessage('Verification code sent to your email. Please check your inbox and enter the code below.');
+        setMessage('Two-factor authentication is enabled. Please enter the 6-digit code from your authenticator app.');
         setMessageType('success');
         setLoading(false);
         return;
@@ -217,7 +217,7 @@ function LoginPage() {
                       placeholder="000000"
                     />
                     <p className="mt-2 text-xs text-gray-500">
-                      Enter the 6-digit code sent to your email address
+                      Enter the 6-digit code from your authenticator app (Google Authenticator, Microsoft Authenticator, etc.)
                     </p>
                   </div>
                 </div>
