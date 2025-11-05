@@ -580,7 +580,7 @@ export default function WalletPage() {
                             <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm hidden lg:table-cell">
                               {withdrawal.transactionHash ? (
                                 <a 
-                                  href={`https://sepolia.etherscan.io/tx/${withdrawal.transactionHash}`}
+                                  href={`https://etherscan.io/tx/${withdrawal.transactionHash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"

@@ -3,18 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
 
 function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    twoFactorCode: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('error');
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [logoLoaded, setLogoLoaded] = useState(false);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,8 +33,27 @@ function LoginPage() {
     setMessage('');
 
     try {
-      const response = await api.post('/api/auth/login', formData);
+      const loginData: any = {
+        email: formData.email,
+        password: formData.password
+      };
+
+      // Include 2FA code if provided
+      if (requiresTwoFactor && formData.twoFactorCode) {
+        loginData.twoFactorCode = formData.twoFactorCode;
+      }
+
+      const response = await api.post('/api/auth/login', loginData);
       
+      // Check if 2FA is required
+      if (response.data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setMessage('Verification code sent to your email. Please check your inbox and enter the code below.');
+        setMessageType('success');
+        setLoading(false);
+        return;
+      }
+
       // Store token in both session storage and cookies (client-side only)
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('authToken', response.data.token);
@@ -62,14 +83,24 @@ function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100 flex-col justify-center items-center px-8 xl:px-12">
         <div className="text-center w-full max-w-md">
           {/* Logo */}
-          <div className="mb-8">
-            <Image
+          <div className="mb-8 flex justify-center items-center">
+            <img
               src="/UOB_logo.png"
               alt="UOB Security House"
-              width={200}
-              height={200}
-              className="h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48 object-contain mx-auto"
-              priority
+              width={192}
+              height={192}
+              className="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain"
+              style={{ display: 'block' }}
+              onError={(e) => {
+                console.error('❌ Logo failed to load from /UOB_logo.png');
+                console.error('Please verify the file exists at: frontend/public/UOB_logo.png');
+                e.currentTarget.style.border = '2px solid red';
+                e.currentTarget.alt = 'Logo not found - Check console';
+              }}
+              onLoad={() => {
+                console.log('✅ Logo loaded successfully');
+                setLogoLoaded(true);
+              }}
             />
           </div>
 
@@ -89,15 +120,27 @@ function LoginPage() {
         <div className="max-w-md mx-auto w-full">
           {/* Mobile Logo (visible on small screens) */}
           <div className="lg:hidden text-center mb-6 sm:mb-8">
-            <Image
-              src="/UOB_logo.png"
-              alt="UOB Security House"
-              width={120}
-              height={120}
-              className="h-20 w-20 sm:h-24 sm:w-24 object-contain mx-auto"
-              priority
-            />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-3 sm:mt-4">
+            <div className="flex justify-center items-center mb-3 sm:mb-4">
+              <img
+                src="/UOB_logo.png"
+                alt="UOB Security House"
+                width={96}
+                height={96}
+                className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
+                style={{ display: 'block' }}
+                onError={(e) => {
+                  console.error('❌ Logo failed to load from /UOB_logo.png');
+                  console.error('Please verify the file exists at: frontend/public/UOB_logo.png');
+                  e.currentTarget.style.border = '2px solid red';
+                  e.currentTarget.alt = 'Logo not found - Check console';
+                }}
+                onLoad={() => {
+                  console.log('✅ Logo loaded successfully');
+                  setLogoLoaded(true);
+                }}
+              />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               UOB Security House
             </h1>
           </div>
@@ -116,9 +159,10 @@ function LoginPage() {
                     type="email" 
                     autoComplete="email"
                     required
+                    disabled={requiresTwoFactor}
                     value={formData.email}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm sm:text-base"
+                    className="appearance-none block w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm sm:text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -135,14 +179,41 @@ function LoginPage() {
                     name="password"
                     type="password" 
                     autoComplete="current-password"
-                    required
+                    required={!requiresTwoFactor}
+                    disabled={requiresTwoFactor}
                     value={formData.password}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm sm:text-base"
+                    className="appearance-none block w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm sm:text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Enter your password"
                   />
                 </div>
               </div>
+
+              {/* 2FA Code Field */}
+              {requiresTwoFactor && (
+                <div>
+                  <label htmlFor="twoFactorCode" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Verification Code
+                  </label>
+                  <div className="mt-1">
+                    <input 
+                      id="twoFactorCode"
+                      name="twoFactorCode"
+                      type="text" 
+                      autoComplete="one-time-code"
+                      required
+                      maxLength={6}
+                      value={formData.twoFactorCode}
+                      onChange={handleChange}
+                      className="appearance-none block w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm sm:text-base text-center text-lg font-mono tracking-widest"
+                      placeholder="000000"
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Enter the 6-digit code sent to your email address
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Remember Me & Forgot Password */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">

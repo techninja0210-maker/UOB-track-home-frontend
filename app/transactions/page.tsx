@@ -590,7 +590,7 @@ export default function TransactionsPage() {
                               <>
                                 <span className="hidden sm:inline">•</span>
                                 <a
-                                  href={`https://sepolia.etherscan.io/tx/${transaction.transactionHash}`}
+                                  href={`https://etherscan.io/tx/${transaction.transactionHash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 hover:underline break-all sm:break-normal"

@@ -487,7 +487,7 @@ export default function AdminTransactions() {
                         </button>
                         {transaction.transaction_hash && (
                           <a
-                            href={`https://sepolia.etherscan.io/tx/${transaction.transaction_hash}`}
+                            href={`https://etherscan.io/tx/${transaction.transaction_hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900 text-left text-xs"
@@ -567,7 +567,7 @@ export default function AdminTransactions() {
                         )}
                         {(withdrawal as Withdrawal).transaction_hash && (
                           <a
-                            href={`https://sepolia.etherscan.io/tx/${(withdrawal as Withdrawal).transaction_hash}`}
+                            href={`https://etherscan.io/tx/${(withdrawal as Withdrawal).transaction_hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900 text-left text-xs"
@@ -736,7 +736,7 @@ export default function AdminTransactions() {
                         {(selectedTransaction as any).transaction_hash}
                       </p>
                       <a
-                        href={`https://sepolia.etherscan.io/tx/${(selectedTransaction as any).transaction_hash}`}
+                        href={`https://etherscan.io/tx/${(selectedTransaction as any).transaction_hash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-900 text-sm"
